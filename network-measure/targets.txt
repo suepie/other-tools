@@ -1,0 +1,9 @@
+﻿# 測定対象の一覧
+#   1 行 1 対象。「URL」または「表示名,URL」の形式で書きます。
+#   # で始まる行と空行は無視されます。
+#   スキームを省略した場合は https:// を補います。
+
+Google,https://www.google.com/
+Yahoo! JAPAN,https://www.yahoo.co.jp/
+Microsoft,https://www.microsoft.com/
+Cloudflare,https://www.cloudflare.com/
