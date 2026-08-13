@@ -7,6 +7,7 @@
 | フォルダ | 内容 | 環境 |
 | --- | --- | --- |
 | [network-measure/](network-measure/) | 複数サイトへ一定間隔で HTTP リクエストし、応答時間・ステータスコード・サイズを CSV に記録する | PowerShell 5.1 / 7+ |
+| [ai-api-measure/](ai-api-measure/) | AI API へ短いプロンプトを一定間隔で投げ、TTFT・応答時間・トークン数・生成速度を CSV に記録する | PowerShell 5.1 / 7+ |
 
 ## 追加するときの決まり
 
