@@ -94,7 +94,9 @@ function Get-Percentile {
     param([double[]]$Values, [double]$Percentile)
 
     if ($Values.Count -eq 0) { return $null }
-    $sorted = $Values | Sort-Object
+    # 要素が 1 つだと Sort-Object はスカラーを返す。StrictMode 下では
+    # スカラーの .Count 参照が例外になるため、必ず配列に包む
+    $sorted = @($Values | Sort-Object)
     $index = [math]::Ceiling($sorted.Count * $Percentile / 100) - 1
     if ($index -lt 0) { $index = 0 }
     if ($index -ge $sorted.Count) { $index = $sorted.Count - 1 }

@@ -20,6 +20,12 @@
 .PARAMETER AllRequests
     指定すると UrlFilter を無視して HAR 内の全リクエストを対象にします。
 
+.PARAMETER Discover
+    探索モード。どの URL を測ればよいか分からないときに使います。
+    絞り込みをせずに全リクエストを読み、ホスト別の集計・ストリーミング応答・
+    時間のかかった POST を表示して終了します（集計は行いません）。
+    ここで見つけた URL を -UrlFilter に渡して本測定します。
+
 .PARAMETER Label
     出力に付ける任意のラベル（「昼」「社内LAN」など、条件を後から見分けるため）。
 
@@ -33,6 +39,14 @@
     .\Measure-FromHar.ps1 .\captures\ -Label '社内LAN 昼'
 
 .EXAMPLE
+    # どの URL がチャット本体か分からないとき（まずこれを実行する）
+    .\Measure-FromHar.ps1 .\m365.har -Discover
+
+.EXAMPLE
+    # 探索で見つけた URL を指定して本測定
+    .\Measure-FromHar.ps1 .\captures\ -UrlFilter 'substrate\.office\.com.*chat'
+
+.EXAMPLE
     # 全リクエストを対象に、ページ読み込み全体を見る
     .\Measure-FromHar.ps1 .\chatgpt.har -AllRequests
 #>
@@ -42,6 +56,7 @@ param(
     [string[]]$Path,
     [string]$UrlFilter = '(backend-api/.*conversation|/api/(chat|conversation)|/v1/(chat/)?completions|/v1/messages|/conversation\b)',
     [switch]$AllRequests,
+    [switch]$Discover,
     [string]$Label = '',
     [string]$OutputDirectory
 )
@@ -84,11 +99,77 @@ function Get-Percentile {
     param([double[]]$Values, [double]$Percentile)
 
     if ($Values.Count -eq 0) { return $null }
-    $sorted = $Values | Sort-Object
+    # 要素が 1 つだと Sort-Object はスカラーを返す。StrictMode 下では
+    # スカラーの .Count 参照が例外になるため、必ず配列に包む
+    $sorted = @($Values | Sort-Object)
     $index = [math]::Ceiling($sorted.Count * $Percentile / 100) - 1
     if ($index -lt 0) { $index = 0 }
     if ($index -ge $sorted.Count) { $index = $sorted.Count - 1 }
     return [math]::Round($sorted[$index], 1)
+}
+
+function Show-Candidate {
+    <#
+        どの URL がチャット本体なのか分からないときに、当たりを付けるための表示。
+        ストリーミング応答は「POST」「長時間」「event-stream か json」という特徴が出ます。
+    #>
+    param([object[]]$Rows)
+
+    $short = {
+        param([string]$u)
+        if ($u.Length -gt 90) { return $u.Substring(0, 90) + '…' }
+        return $u
+    }
+
+    Write-Host ''
+    Write-Host '===== ホスト別のリクエスト数と最長時間 ====='
+    $Rows | Group-Object -Property Host | Sort-Object Count -Descending | Select-Object -First 15 |
+        ForEach-Object {
+            $times = @($_.Group | Where-Object { $null -ne $_.TotalMs } | ForEach-Object { [double]$_.TotalMs })
+            [pscustomobject]@{
+                Host       = $_.Name
+                Requests   = $_.Count
+                MaxTotalMs = if ($times.Count) { [math]::Round(($times | Measure-Object -Maximum).Maximum, 1) } else { $null }
+            }
+        } | Format-Table -AutoSize
+
+    $sse = @($Rows | Where-Object { $_.MimeType -match 'event-stream' })
+    Write-Host "===== ストリーミング応答（event-stream）: $($sse.Count) 件 ====="
+    if ($sse.Count) {
+        $sse | Sort-Object { [double]($_.TotalMs) } -Descending | Select-Object -First 10 |
+            ForEach-Object {
+                [pscustomobject]@{
+                    TotalMs = $_.TotalMs
+                    WaitMs  = $_.WaitMs
+                    Method  = $_.Method
+                    Url     = & $short $_.Url
+                }
+            } | Format-Table -AutoSize
+    } else {
+        Write-Host '  なし（M365 のように WebSocket や通常の JSON 応答を使う実装もあります）'
+        Write-Host ''
+    }
+
+    Write-Host '===== 時間のかかった POST 上位20（チャット本体の最有力候補） ====='
+    $slow = @($Rows | Where-Object { $_.Method -eq 'POST' -and $null -ne $_.TotalMs })
+    if ($slow.Count) {
+        $slow | Sort-Object { [double]($_.TotalMs) } -Descending | Select-Object -First 20 |
+            ForEach-Object {
+                [pscustomobject]@{
+                    TotalMs  = $_.TotalMs
+                    WaitMs   = $_.WaitMs
+                    Status   = $_.StatusCode
+                    MimeType = $_.MimeType
+                    Url      = & $short $_.Url
+                }
+            } | Format-Table -AutoSize
+    } else {
+        Write-Host '  POST がありません'
+        Write-Host ''
+    }
+
+    Write-Host '目星が付いたら、その URL に当たる正規表現を -UrlFilter に渡して測定してください。例:'
+    Write-Host '  .\Measure-FromHar.ps1 .\captures\ -UrlFilter ''substrate\.office\.com.*chat'''
 }
 
 function Resolve-HarFile {
@@ -134,7 +215,7 @@ function Read-HarEntry {
 
         $url = [string](Get-Prop $request 'url' '')
         if (-not $url) { continue }
-        if (-not $AllRequests -and $url -notmatch $UrlFilter) { continue }
+        if (-not $AllRequests -and -not $Discover -and $url -notmatch $UrlFilter) { continue }
 
         $uri = $null
         [void][Uri]::TryCreate($url, [UriKind]::Absolute, [ref]$uri)
@@ -185,7 +266,9 @@ if ($files.Count -eq 0) {
 
 Write-Host "対象 HAR : $($files.Count) 件"
 if ($Label) { Write-Host "ラベル   : $Label" }
-if ($AllRequests) {
+if ($Discover) {
+    Write-Host "モード   : 探索（絞り込みなし。候補を表示して終了します）"
+} elseif ($AllRequests) {
     Write-Host "絞り込み : なし（全リクエスト）"
 } else {
     Write-Host "絞り込み : $UrlFilter"
@@ -200,7 +283,7 @@ foreach ($file in $files) {
 }
 
 if ($rows.Count -eq 0) {
-    Write-Warning '条件に一致するリクエストがありませんでした。-UrlFilter を緩めるか -AllRequests を試してください。'
+    Write-Warning '条件に一致するリクエストがありませんでした。-Discover でどの URL が記録されているか確認してください。'
     return
 }
 
@@ -213,6 +296,16 @@ $detailCsv  = Join-Path $OutputDirectory "har-$stamp.csv"
 $summaryCsv = Join-Path $OutputDirectory "har-$stamp-summary.csv"
 
 $rows | Export-Csv -LiteralPath $detailCsv -NoTypeInformation -Encoding $csvEncoding
+
+# ---- 探索モード ----------------------------------------------------------
+# どの URL を測ればよいか分からないとき用。候補を出して終わる。
+
+if ($Discover) {
+    Show-Candidate -Rows $rows.ToArray()
+    Write-Host ''
+    Write-Host "全リクエストの明細 CSV : $detailCsv"
+    return
+}
 
 # ---- 集計 ----------------------------------------------------------------
 
