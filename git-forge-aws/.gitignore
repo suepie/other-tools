@@ -1,0 +1,21 @@
+# Terraform
+.terraform/
+.terraform.tfstate.lock.info
+
+# state はローカルに残さない（S3 バックエンド）。bootstrap のローカル state も含めて除外
+*.tfstate
+*.tfstate.*
+
+# 変数ファイルには IP や FQDN など環境固有の値が入るためコミットしない
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# バックエンド設定（バケット名はアカウント固有）
+backend.hcl
+
+# 計画ファイルには秘匿値が含まれうる
+*.tfplan
+
+# 依存ロックファイル（.terraform.lock.hcl）は意図的に除外していません。
+# プロバイダのバージョンを固定するためコミットしてください。

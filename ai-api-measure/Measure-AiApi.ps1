@@ -159,12 +159,16 @@ function New-RequestBody {
         'openai-compatible' {
             $maxTokensField = [string](Get-ConfigValue $Endpoint 'maxTokensField' 'max_tokens')
             $body = [ordered]@{
-                model          = $model
-                stream         = $true
-                stream_options = @{ include_usage = $true }
-                messages       = @(@{ role = 'user'; content = $Prompt })
+                model    = $model
+                stream   = $true
+                messages = @(@{ role = 'user'; content = $Prompt })
             }
             $body[$maxTokensField] = $MaxTokens
+
+            # トークン数を得るための拡張。受け付けない実装向けに streamOptions: false で外せる
+            if ([bool](Get-ConfigValue $Endpoint 'streamOptions' $true)) {
+                $body['stream_options'] = @{ include_usage = $true }
+            }
             return $body
         }
         default {
@@ -186,12 +190,14 @@ function Set-RequestHeader {
             if ($betas) { $Request.Headers.Add('anthropic-beta', (@($betas) -join ',')) }
         }
         'openai-compatible' {
-            # Azure OpenAI は api-key ヘッダなので、設定で切り替えられるようにする
-            $scheme = [string](Get-ConfigValue $Endpoint 'authHeader' 'bearer')
-            if ($scheme -eq 'api-key') {
-                $Request.Headers.Add('api-key', $ApiKey)
-            } else {
-                $Request.Headers.Add('Authorization', "Bearer $ApiKey")
+            if ($ApiKey) {
+                # Azure OpenAI は api-key ヘッダなので、設定で切り替えられるようにする
+                $scheme = [string](Get-ConfigValue $Endpoint 'authHeader' 'bearer')
+                if ($scheme -eq 'api-key') {
+                    $Request.Headers.Add('api-key', $ApiKey)
+                } else {
+                    $Request.Headers.Add('Authorization', "Bearer $ApiKey")
+                }
             }
         }
     }
@@ -238,12 +244,18 @@ function Invoke-AiMeasurement {
         Error              = ''
     }
 
-    if (-not $url)    { $result['Error'] = 'url が設定されていません'; return [pscustomobject]$result }
-    if (-not $keyEnv) { $result['Error'] = 'apiKeyEnv が設定されていません'; return [pscustomobject]$result }
+    if (-not $url) { $result['Error'] = 'url が設定されていません'; return [pscustomobject]$result }
 
-    $apiKey = [Environment]::GetEnvironmentVariable($keyEnv)
-    if (-not $apiKey) {
-        $result['Error'] = "環境変数 $keyEnv に API キーが設定されていません"
+    # apiKeyEnv は省略可。省略時は認証ヘッダを付けない（Ollama などキー不要のローカル LLM 用）
+    $apiKey = ''
+    if ($keyEnv) {
+        $apiKey = [Environment]::GetEnvironmentVariable($keyEnv)
+        if (-not $apiKey) {
+            $result['Error'] = "環境変数 $keyEnv に API キーが設定されていません"
+            return [pscustomobject]$result
+        }
+    } elseif ($provider -eq 'anthropic') {
+        $result['Error'] = 'apiKeyEnv が設定されていません'
         return [pscustomobject]$result
     }
 

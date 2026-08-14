@@ -1,0 +1,49 @@
+# このファイルを terraform.tfvars にコピーして編集します。
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# ★ terraform.tfvars は .gitignore 済みです。
+#   パスワード・トークン・AWS のアクセスキーをここに書く必要は一切ありません。
+
+project = "project-a"
+region  = "ap-northeast-1"
+
+# 接続を許可する固定 IP。ここが唯一の入口です。
+allowed_cidrs = [
+  "203.0.113.10/32",  # 本社
+  "198.51.100.20/32", # データセンタ
+]
+
+# FQDN と、それを含む Route 53 ホストゾーン ID
+domain_name     = "git-project-a.example.com"
+route53_zone_id = "Z0123456789ABCDEFGHIJ"
+
+# 初期管理者。パスワードは Terraform が生成して Secrets Manager に入れます。
+admin_username = "forgeadmin"
+admin_email    = "admin@example.com"
+
+# ---- 任意 ----------------------------------------------------------------
+
+# Managed Instances が選ぶインスタンスの下限。CI が重いなら上げてください。
+# instance_vcpu_min       = 2
+# instance_memory_mib_min = 4096
+# instance_storage_gib    = 100
+
+# CI で x86 バイナリをビルドするなら Graviton を除外する
+# cpu_manufacturers = ["intel", "amd"]
+
+# イメージタグは公式で最新を確認して固定してください
+# forge_image  = "codeberg.org/forgejo/forgejo:11"
+# runner_image = "code.forgejo.org/forgejo/runner:9"
+
+# ランナーのラベル（ワークフローの runs-on に書く値）
+# runner_labels = "docker:docker://node:22-bookworm"
+
+# Actions を使わない場合
+# enable_runner = false
+
+# RDS
+# db_instance_class    = "db.t4g.micro"
+# db_allocated_storage = 20
+
+# 本番では 7〜30 を推奨（0 は destroy 後すぐ作り直せる検証向け）
+# secret_recovery_window_days = 7

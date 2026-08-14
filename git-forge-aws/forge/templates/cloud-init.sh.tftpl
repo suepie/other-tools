@@ -1,0 +1,166 @@
+#!/bin/bash
+#
+# Forge インスタンスの初期化。
+# ログは /var/log/forge-bootstrap.log に残ります。うまく動かないときはまずここを見てください。
+#
+set -euo pipefail
+exec > >(tee -a /var/log/forge-bootstrap.log) 2>&1
+echo "=== forge bootstrap start: $(date -Is) ==="
+
+# ---- Docker ---------------------------------------------------------------
+
+dnf -y install docker
+
+install -d /usr/local/lib/docker/cli-plugins
+curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-compose \
+  https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+systemctl enable --now docker
+
+# ---- データボリューム -----------------------------------------------------
+# EBS は NVMe として見えるためデバイス名が固定できない。
+# ボリューム ID から作られる by-id パスで確実に特定する。
+
+DEV="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${volume_nvme_id}"
+
+echo "waiting for data volume: $DEV"
+for _ in $(seq 1 60); do
+  [ -e "$DEV" ] && break
+  sleep 5
+done
+
+if [ ! -e "$DEV" ]; then
+  echo "ERROR: data volume did not appear within timeout" >&2
+  exit 1
+fi
+
+# 既にフォーマット済みなら触らない（インスタンス再作成時にデータを消さないため）
+if ! blkid "$DEV" >/dev/null 2>&1; then
+  echo "formatting $DEV"
+  mkfs.xfs "$DEV"
+else
+  echo "$DEV already has a filesystem; keeping it"
+fi
+
+mkdir -p /mnt/forge
+if ! grep -q " /mnt/forge " /etc/fstab; then
+  echo "$DEV /mnt/forge xfs defaults,nofail 0 2" >> /etc/fstab
+fi
+mount -a
+
+mkdir -p /mnt/forge/data /mnt/forge/runner
+chown -R 1000:1000 /mnt/forge/data /mnt/forge/runner
+
+# ---- compose 定義 ---------------------------------------------------------
+
+install -d /opt/forge
+
+cat > /opt/forge/docker-compose.yml <<'COMPOSE'
+services:
+  forgejo:
+    image: ${forge_image}
+    container_name: forgejo
+    restart: always
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      # インストールウィザードを飛ばして自動構築する
+      FORGEJO__security__INSTALL_LOCK: "true"
+      FORGEJO__server__ROOT_URL: "${root_url}"
+      FORGEJO__server__DOMAIN: "${domain}"
+      FORGEJO__server__HTTP_PORT: "3000"
+      # Git は HTTPS 経由のみ。SSH を使わないぶん公開ポートを減らせる
+      FORGEJO__server__DISABLE_SSH: "true"
+      FORGEJO__database__DB_TYPE: "sqlite3"
+      FORGEJO__database__PATH: "/data/forgejo.db"
+      # 自己サインアップ禁止 + 未ログインには何も見せない
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+      FORGEJO__actions__ENABLED: "true"
+    volumes:
+      - /mnt/forge/data:/data
+    ports:
+      - "3000:3000"
+
+  runner:
+    image: ${runner_image}
+    container_name: forgejo-runner
+    restart: always
+    depends_on:
+      - forgejo
+    working_dir: /data
+    volumes:
+      - /mnt/forge/runner:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["forgejo-runner", "daemon"]
+COMPOSE
+
+cd /opt/forge
+
+# ---- 起動 -----------------------------------------------------------------
+
+docker compose up -d forgejo
+
+echo "waiting for forgejo to become healthy"
+for _ in $(seq 1 60); do
+  curl -fsS http://localhost:3000/api/healthz >/dev/null 2>&1 && break
+  sleep 5
+done
+
+# ---- 管理者ユーザー -------------------------------------------------------
+# パスワードは Secrets Manager から取得する。この user_data には平文で載せない。
+
+ADMIN_PW="$(aws secretsmanager get-secret-value \
+  --secret-id '${secret_arn}' \
+  --region '${region}' \
+  --query SecretString --output text \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["password"])')"
+
+docker compose exec -T -u git forgejo forgejo admin user create \
+  --admin \
+  --username '${admin_username}' \
+  --email '${admin_email}' \
+  --password "$ADMIN_PW" \
+  --must-change-password=false \
+  || echo "NOTE: admin user already exists or creation failed; continuing"
+
+unset ADMIN_PW
+
+# ---- Actions ランナー -----------------------------------------------------
+%{ if enable_runner ~}
+
+if [ ! -f /mnt/forge/runner/.runner ]; then
+  echo "registering actions runner"
+
+  # CLI のサブコマンド名はバージョンで揺れるため両方試す
+  TOKEN="$(docker compose exec -T -u git forgejo forgejo forgejo-cli actions generate-runner-token 2>/dev/null | tr -d '\r\n' || true)"
+  if [ -z "$TOKEN" ]; then
+    TOKEN="$(docker compose exec -T -u git forgejo forgejo actions generate-runner-token 2>/dev/null | tr -d '\r\n' || true)"
+  fi
+
+  if [ -n "$TOKEN" ]; then
+    docker compose run --rm -u 1000:1000 runner \
+      forgejo-runner register \
+        --no-interactive \
+        --instance http://forgejo:3000 \
+        --token "$TOKEN" \
+        --name "$(hostname)" \
+        --labels '${runner_labels}'
+    echo "runner registered"
+  else
+    echo "WARN: could not generate a runner token automatically."
+    echo "      Web UI の Site Administration > Actions > Runners でトークンを発行し、"
+    echo "      インスタンス上で次を実行してください:"
+    echo "      cd /opt/forge && docker compose run --rm -u 1000:1000 runner \\"
+    echo "        forgejo-runner register --no-interactive --instance http://forgejo:3000 \\"
+    echo "        --token <TOKEN> --name \$(hostname) --labels '${runner_labels}'"
+  fi
+fi
+
+docker compose up -d
+%{ else ~}
+echo "runner disabled (enable_runner = false)"
+%{ endif ~}
+
+echo "=== forge bootstrap done: $(date -Is) ==="

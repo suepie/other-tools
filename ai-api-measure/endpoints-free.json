@@ -1,0 +1,34 @@
+{
+  "prompt": "「OK」とだけ返答してください。",
+  "maxTokens": 64,
+
+  "endpoints": [
+    {
+      "name": "Groq (Llama 3.3 70B)",
+      "provider": "openai-compatible",
+      "url": "https://api.groq.com/openai/v1/chat/completions",
+      "model": "llama-3.3-70b-versatile",
+      "apiKeyEnv": "GROQ_API_KEY"
+    },
+    {
+      "name": "OpenRouter (free)",
+      "provider": "openai-compatible",
+      "url": "https://openrouter.ai/api/v1/chat/completions",
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "apiKeyEnv": "OPENROUTER_API_KEY"
+    },
+    {
+      "name": "Google AI Studio",
+      "provider": "openai-compatible",
+      "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "model": "gemini-2.0-flash",
+      "apiKeyEnv": "GEMINI_API_KEY"
+    },
+    {
+      "name": "Ollama (local)",
+      "provider": "openai-compatible",
+      "url": "http://localhost:11434/v1/chat/completions",
+      "model": "llama3.2"
+    }
+  ]
+}

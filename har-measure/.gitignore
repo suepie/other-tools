@@ -1,0 +1,6 @@
+# 測定結果は成果物なのでコミットしない
+results/
+
+# HAR には Cookie や Authorization ヘッダがそのまま入るので絶対にコミットしない
+captures/
+*.har

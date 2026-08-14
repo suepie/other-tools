@@ -1,0 +1,39 @@
+# このファイルを terraform.tfvars にコピーして編集します。
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# ★ terraform.tfvars は .gitignore 済みです。ここに秘密（パスワード、トークン、
+#   AWS のアクセスキー）を書く必要は一切ありません。書かないでください。
+
+project = "project-a"
+region  = "ap-northeast-1"
+
+# 接続を許可する固定 IP。ここが唯一の入口です。
+# 0.0.0.0/0 は変数のバリデーションで弾かれます。
+allowed_cidrs = [
+  "203.0.113.10/32", # 本社
+  "198.51.100.20/32", # データセンタ
+]
+
+# FQDN と、それを含む Route 53 ホストゾーン ID。
+# ACM の DNS 検証とレコード作成に使います。
+domain_name     = "git-project-a.example.com"
+route53_zone_id = "Z0123456789ABCDEFGHIJ"
+
+# 初期管理者。パスワードは Terraform が生成して Secrets Manager に入れます。
+admin_username = "forgeadmin"
+admin_email    = "admin@example.com"
+
+# ---- 任意 ----------------------------------------------------------------
+
+# instance_type    = "t4g.small"
+# data_volume_size = 50
+
+# Actions ランナーを同居させない場合
+# enable_runner = false
+
+# イメージタグは公式で最新を確認して固定してください
+# forge_image  = "codeberg.org/forgejo/forgejo:11"
+# runner_image = "code.forgejo.org/forgejo/runner:9"
+
+# 本番では 7〜30 を推奨（0 は destroy 後すぐ作り直せる検証向け）
+# secret_recovery_window_days = 7

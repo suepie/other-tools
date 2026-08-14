@@ -7,3 +7,12 @@ Google,https://www.google.com/
 Yahoo! JAPAN,https://www.yahoo.co.jp/
 Microsoft,https://www.microsoft.com/
 Cloudflare,https://www.cloudflare.com/
+
+# --- AI サービスへの到達性 ---
+#   認証なしで叩くので 401（ChatGPT Web はボット判定で 403 のことも）が返りますが、それで正常です。
+#   目的は「そこまで届くか、何ミリ秒で応答が返るか」なので、集計の所要時間には
+#   401/403 の行も含めています（成功数は OkCount、これらは HttpErrorCount として別に数えます）。
+#   推論そのものの速さは測れません。それは ai-api-measure / har-measure の担当です。
+OpenAI API,https://api.openai.com/v1/models
+Anthropic API,https://api.anthropic.com/v1/models
+ChatGPT Web,https://chatgpt.com/

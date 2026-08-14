@@ -78,13 +78,14 @@ powershell -ExecutionPolicy Bypass -File .\Measure-AiApi.ps1
 | `provider` | — | `anthropic`（既定）または `openai-compatible` |
 | `url` | ✅ | エンドポイント URL |
 | `model` | ✅ | モデル ID |
-| `apiKeyEnv` | ✅ | API キーが入っている**環境変数名** |
+| `apiKeyEnv` | △ | API キーが入っている**環境変数名**。`anthropic` では必須。`openai-compatible` で省略すると認証ヘッダを付けません（Ollama などキー不要のローカル LLM 用） |
 | `thinking` | — | `disabled` / `adaptive` / `none`（既定 `none` = パラメータを送らない） |
 | `effort` | — | `low` / `medium` / `high` / `xhigh` / `max`。指定時のみ送信 |
 | `betas` | — | `anthropic-beta` ヘッダに入れる値の配列 |
 | `headers` | — | 追加ヘッダ（オブジェクト） |
 | `authHeader` | — | `openai-compatible` 用。`bearer`（既定）/ `api-key`（Azure OpenAI） |
 | `maxTokensField` | — | `openai-compatible` 用。既定 `max_tokens` |
+| `streamOptions` | — | `openai-compatible` 用。既定 `true`。`stream_options` を受け付けない実装では `false` にする（代わりにトークン数は記録されません） |
 
 ### 測定値を安定させるための既定
 
@@ -106,6 +107,24 @@ Azure OpenAI やローカル LLM（Ollama、LM Studio など）も同じ CSV で
   "apiKeyEnv": "LOCAL_LLM_API_KEY"
 }
 ```
+
+### キーを払い出せない場合の代替（`endpoints-free.json`）
+
+会社で OpenAI や Anthropic のキーが出せない場合に、個人アカウントの無料枠やローカル LLM で測るための設定を同梱しています。
+
+```powershell
+$env:GROQ_API_KEY = 'gsk_...'
+.\Measure-AiApi.ps1 -ConfigFile .\endpoints-free.json -Only 'Groq (Llama 3.3 70B)'
+```
+
+| 対象 | キー | 備考 |
+| --- | --- | --- |
+| Groq | `GROQ_API_KEY` | 無料枠あり。推論が速いので TTFT の下限値の目安になります |
+| OpenRouter | `OPENROUTER_API_KEY` | `:free` 付きモデルは無料枠 |
+| Google AI Studio | `GEMINI_API_KEY` | OpenAI 互換エンドポイント経由 |
+| Ollama | 不要 | ローカル実行。`apiKeyEnv` を書いていないので認証ヘッダは付きません |
+
+**モデル ID は各サービスで改廃されます。** 404 や 400 が出たら、そのサービスのモデル一覧で現行の ID に置き換えてください。`stream_options` を受け付けないサービスでは `"streamOptions": false` を足します。
 
 ## 出力
 

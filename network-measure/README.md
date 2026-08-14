@@ -59,6 +59,8 @@ Yahoo! JAPAN,https://www.yahoo.co.jp/
 www.microsoft.com
 ```
 
+同梱の `targets.txt` には、一般サイトに加えて AI サービス（`api.openai.com` / `api.anthropic.com` / `chatgpt.com`）への到達性チェックも入れてあります。認証なしなので `401`（`chatgpt.com` はボット判定で `403` のことも）が返りますが、それで正常です。**推論そのものの速さは測れません** — それは [ai-api-measure/](../ai-api-measure/) と [har-measure/](../har-measure/) の担当です。
+
 ## キャッシュ対策
 
 「キャッシュが効いて速く見えてしまう」のを避けるため、既定で次の 3 つを行っています。
@@ -87,11 +89,24 @@ www.microsoft.com
 | `SizeBytes` | レスポンスサイズ（不明な場合は `-1`） |
 | `ThroughputKBps` | `SizeBytes` / `ElapsedMs` から算出したスループット |
 | `ContentType` | レスポンスの Content-Type |
-| `Success` / `Error` | 成否とエラーメッセージ |
+| `Responded` | サーバから HTTP 応答が返ったか。`401`/`403` でも `True`（到達性の測定値としては有効なため） |
+| `Success` / `Error` | 2xx/3xx だったかと、エラーメッセージ |
 
 ### 集計 `results/network-YYYYMMDD-HHmmss-summary.csv`
 
-対象ごとの `Requests` / `SuccessCount` / `ErrorCount` / `SuccessRate` と、応答時間の `AvgMs` `MedianMs` `MinMs` `MaxMs` `P95Ms`、`AvgSizeBytes` を出力します。同じ内容が実行終了時にコンソールにも表示されます。
+対象ごとに次を出力します。同じ内容が実行終了時にコンソールにも表示されます。
+
+| 列 | 内容 |
+| --- | --- |
+| `Requests` | リクエスト数 |
+| `OkCount` | 2xx/3xx が返った回数 |
+| `HttpErrorCount` | 応答は返ったが 4xx/5xx だった回数 |
+| `NoResponseCount` | 接続できなかった（タイムアウト・DNS 失敗など）回数 |
+| `OkRate` | `OkCount` の割合（%） |
+| `AvgMs` `MedianMs` `MinMs` `MaxMs` `P95Ms` | 応答時間。**`OkCount` と `HttpErrorCount` の両方**を対象に集計します |
+| `AvgSizeBytes` | 2xx/3xx だったリクエストの平均サイズ |
+
+応答時間を 4xx/5xx も含めて集計しているのは、認証なしで叩く API のように「`401` が返ってくること自体が正常」な対象を測れるようにするためです。接続できなかった行（`NoResponseCount`）は所要時間が意味を持たないので除外しています。
 
 ## 動作環境
 

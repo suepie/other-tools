@@ -228,6 +228,8 @@ function Invoke-Measurement {
         SizeBytes       = $sizeBytes
         ThroughputKBps  = $throughput
         ContentType     = $contentType
+        # 401/403 のようにサーバが応答している場合、成功ではないが所要時間としては有効な測定値
+        Responded       = ($null -ne $status)
         Success         = $success
         Error           = $errorText
     }
@@ -299,22 +301,26 @@ for ($cycle = 1; $cycle -le $totalCycles; $cycle++) {
 
 $summary = foreach ($group in ($results | Group-Object -Property Name)) {
     $ok = @($group.Group | Where-Object { $_.Success })
-    $times = @($ok | ForEach-Object { [double]$_.ElapsedMs })
+
+    # 所要時間は「サーバが応答した」リクエストで集計する。401/403 でも到達性の測定値としては有効
+    $responded = @($group.Group | Where-Object { $_.Responded })
+    $times = @($responded | ForEach-Object { [double]$_.ElapsedMs })
     $sizes = @($ok | Where-Object { $_.SizeBytes -gt 0 } | ForEach-Object { [double]$_.SizeBytes })
 
     [pscustomobject]@{
-        Name         = $group.Name
-        Url          = $group.Group[0].Url
-        Requests     = $group.Count
-        SuccessCount = $ok.Count
-        ErrorCount   = $group.Count - $ok.Count
-        SuccessRate  = [math]::Round(100 * $ok.Count / $group.Count, 1)
-        AvgMs        = if ($times.Count) { [math]::Round(($times | Measure-Object -Average).Average, 1) } else { $null }
-        MinMs        = if ($times.Count) { [math]::Round(($times | Measure-Object -Minimum).Minimum, 1) } else { $null }
-        MaxMs        = if ($times.Count) { [math]::Round(($times | Measure-Object -Maximum).Maximum, 1) } else { $null }
-        MedianMs     = Get-Percentile -Values $times -Percentile 50
-        P95Ms        = Get-Percentile -Values $times -Percentile 95
-        AvgSizeBytes = if ($sizes.Count) { [math]::Round(($sizes | Measure-Object -Average).Average, 0) } else { $null }
+        Name            = $group.Name
+        Url             = $group.Group[0].Url
+        Requests        = $group.Count
+        OkCount         = $ok.Count
+        HttpErrorCount  = $responded.Count - $ok.Count
+        NoResponseCount = $group.Count - $responded.Count
+        OkRate          = [math]::Round(100 * $ok.Count / $group.Count, 1)
+        AvgMs           = if ($times.Count) { [math]::Round(($times | Measure-Object -Average).Average, 1) } else { $null }
+        MinMs           = if ($times.Count) { [math]::Round(($times | Measure-Object -Minimum).Minimum, 1) } else { $null }
+        MaxMs           = if ($times.Count) { [math]::Round(($times | Measure-Object -Maximum).Maximum, 1) } else { $null }
+        MedianMs        = Get-Percentile -Values $times -Percentile 50
+        P95Ms           = Get-Percentile -Values $times -Percentile 95
+        AvgSizeBytes    = if ($sizes.Count) { [math]::Round(($sizes | Measure-Object -Average).Average, 0) } else { $null }
     }
 }
 
@@ -322,6 +328,6 @@ $summary | Export-Csv -LiteralPath $summaryCsv -NoTypeInformation -Encoding $csv
 
 Write-Host ''
 Write-Host '===== 集計 ====='
-$summary | Format-Table Name, Requests, SuccessCount, ErrorCount, AvgMs, MedianMs, MinMs, MaxMs, P95Ms, AvgSizeBytes -AutoSize
+$summary | Format-Table Name, Requests, OkCount, HttpErrorCount, NoResponseCount, AvgMs, MedianMs, MinMs, MaxMs, P95Ms, AvgSizeBytes -AutoSize
 Write-Host "明細 CSV : $detailCsv"
 Write-Host "集計 CSV : $summaryCsv"
