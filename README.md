@@ -45,7 +45,19 @@ VS Code でこのフォルダを開き、**「Reopen in Container」**を選ぶ�
 | **PowerShell 7** | `network-measure` / `ai-api-measure` / `har-measure` のスクリプト実行 |
 | Docker CLI | ホストの Docker を利用（docker-outside-of-docker） |
 
-`~/.aws` をマウントしているので、コンテナ内で `aws sso login` した認証情報はホストと共有されます。
+### AWS 認証情報の共有について
+
+`~/.aws` をバインドマウントしているため、**ホストと全 devcontainer が同じ設定・同じ SSO トークンキャッシュを共有します。コンテナを分けても認証は分離されません。**
+
+ただし**権限の越境は起きません**。SSO のトークンは start URL（Identity Center インスタンス）ごとに別ファイルでキャッシュされるので、組織 A にログインしても組織外アカウントの資格情報は得られません。
+
+残るリスクは**プロファイルの選択ミス**だけです。対策は次の3つです。
+
+1. **`[default]` プロファイルを作らない** — 設定忘れが「見つからない」という明確なエラーになります。あると黙って別アカウントを触ります
+2. **`git-forge-aws` の `allowed_account_ids`** — 間違ったアカウントなら Terraform が実行前に止まります。運用の注意力に依存しないので最も確実です
+3. 常に同じアカウントで作業するなら `devcontainer.json` の `remoteEnv` で `AWS_PROFILE` を固定（コメントで例を記載）
+
+**案件ごとに完全分離したい場合**は、`~/.aws` のマウントを名前付きボリュームに変えてください（`devcontainer.json` にコメントで記載）。その場合はコンテナ内で `aws configure sso` と `aws sso login --no-browser` が必要になります。
 
 ### Windows で気をつける点
 

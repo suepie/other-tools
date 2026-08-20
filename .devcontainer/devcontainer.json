@@ -20,10 +20,25 @@
   // Windows では HOME が空で USERPROFILE が入るため、連結すると両対応になります。
   // ★ホスト側に .aws / .claude が存在しないとコンテナ起動に失敗します。
   //   Windows なら事前に:  mkdir %USERPROFILE%\.aws  %USERPROFILE%\.claude
+  //
+  // ★このマウントにより、ホストと全 devcontainer が同じ AWS 設定と
+  //   SSO トークンキャッシュを共有します。コンテナを分けても分離されません。
+  //   本リポジトリは複数アカウントを扱うため共有が適切ですが、案件ごとに
+  //   完全分離したい場合は、この行を消して名前付きボリュームに変えてください:
+  //     "source=other-tools-aws,target=/home/node/.aws,type=volume"
+  //   （その場合はコンテナ内で aws configure sso と
+  //     aws sso login --no-browser を実行します）
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.aws,target=/home/node/.aws,type=bind",
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/home/node/.claude,type=bind"
   ],
+
+  // 常に同じアカウントで作業するなら、ここで固定するとプロファイルの
+  // 切り替え忘れを防げます。複数プロジェクトを扱う間は未設定のままにし、
+  // git-forge-aws 側の allowed_account_ids で誤適用を止めます。
+  // "remoteEnv": {
+  //   "AWS_PROFILE": "orga-project-a"
+  // },
 
   "postCreateCommand": "bash .devcontainer/post-create.sh",
 
