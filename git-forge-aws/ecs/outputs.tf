@@ -3,6 +3,16 @@ output "forge_url" {
   value       = local.forge_root_url
 }
 
+output "cluster_name" {
+  description = "ECS クラスタ名"
+  value       = aws_ecs_cluster.this.name
+}
+
+output "service_names" {
+  description = "ECS サービス名（forge と runner）"
+  value       = compact([aws_ecs_service.forge.name, try(aws_ecs_service.runner[0].name, "")])
+}
+
 output "cloudfront_distribution_id" {
   description = "CloudFront ディストリビューション ID"
   value       = aws_cloudfront_distribution.forge.id

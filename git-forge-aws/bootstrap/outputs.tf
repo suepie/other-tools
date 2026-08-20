@@ -9,13 +9,15 @@ output "state_kms_key_arn" {
 }
 
 output "backend_config" {
-  description = "forge/backend.hcl にそのまま貼れるバックエンド設定"
-  value       = <<-EOT
-    bucket       = "${aws_s3_bucket.tfstate.id}"
-    key          = "forge/terraform.tfstate"
-    region       = "${var.region}"
-    encrypt      = true
-    kms_key_id   = "${aws_kms_key.tfstate.arn}"
-    use_lockfile = true
+  description = <<-EOT
+    バックエンド設定の中身。
+    apply 時に ecs/backend.hcl へ自動で書き出されるので、通常は使いません
+    （手で再生成したいときの控えとして残しています）。
   EOT
+  value       = local.backend_config
+}
+
+output "backend_config_path" {
+  description = "自動生成された backend.hcl のパス"
+  value       = local_file.backend_config.filename
 }

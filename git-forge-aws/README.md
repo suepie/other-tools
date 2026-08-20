@@ -133,60 +133,79 @@ elasticloadbalancing  cloudfront  wafv2  s3  logs
 
 ## 手順
 
-### 1. 認証
+**Makefile を用意しています。`make help` で一覧が出ます。**
+
+### 0. 認証
 
 ```bash
-aws sso login --profile project-a
-export AWS_PROFILE=project-a
+aws sso login --sso-session <セッション名> --no-browser   # devcontainer 内なら --no-browser
 ```
+
+### 1. 変数を用意して事前確認
+
+```bash
+cp bootstrap/terraform.tfvars.example bootstrap/terraform.tfvars
+cp ecs/terraform.tfvars.example       ecs/terraform.tfvars
+# aws_profile / allowed_account_ids / project / allowed_cidrs / admin_email を編集
+```
+
+```bash
+make check
+```
+
+ツールの有無、認証状態、**`allowed_cidrs` に入れるべきグローバル IP**、設定ファイルの有無をまとめて表示します。
 
 ### 2. tfstate の置き場を作る（アカウントごとに1回）
 
 ```bash
-cd bootstrap
-cp terraform.tfvars.example terraform.tfvars   # project と region を編集
-terraform init
-terraform apply
-terraform output -raw backend_config > ../ecs/backend.hcl
+make bootstrap-init
+make bootstrap-apply
 ```
+
+**`ecs/backend.hcl` は apply 時に自動生成されます**（`local_file` リソース）。手でコマンドを打つ必要はありません。生成内容も表示されます。
 
 > ℹ️ **bootstrap だけはローカル state です**（tfstate の置き場を作るスタック自身は、まだその置き場を使えないため）。失っても、バケットと KMS キーは残っているので `terraform import` で復旧できます。
 
-### 3. 変数を用意する
+### 3. 本体を作る
 
 ```bash
-cd ../ecs
-cp terraform.tfvars.example terraform.tfvars
-# project / allowed_cidrs / admin_email を埋める
-```
-
-### 4. 本体を作る
-
-```bash
-terraform init -backend-config=backend.hcl
-terraform apply
+make init
+make plan     # リソース 60〜70 個程度が出れば正常
+make apply
 ```
 
 **初回は 25〜35 分程度かかります。** VPC オリジンの作成に最大 15 分、CloudFront の配信開始と RDS の作成にそれぞれ数分〜十数分かかるためです。
 
-### 5. 初期セットアップ（1回だけ）
+### 4. 初期セットアップ（1回だけ）
 
-forge サービスが安定したら、管理者作成とランナー登録を行う使い捨てタスクを実行します。
+forge サービスが安定してから実行します。
 
 ```bash
-eval "$(terraform output -raw bootstrap_command)"
+make status   # RUNNING になっているか確認
+make setup    # 管理者作成 + ランナー登録
+make logs     # bootstrap-done が出れば成功
 ```
 
-進捗は CloudWatch Logs（`terraform output log_group`）の `bootstrap` ストリームで確認できます。
-
-### 6. ログインする
+### 5. ログインする
 
 ```bash
-terraform output forge_url
-terraform output -raw admin_credentials_command | sh
+make url      # https://xxxxx.cloudfront.net/
+make creds    # ユーザー名とパスワード
 ```
 
 `allowed_cidrs` に入れた IP からアクセスしてください。それ以外からは WAF が 403 を返します。
+
+### そのほかのターゲット
+
+| コマンド | 内容 |
+| --- | --- |
+| `make myip` | アクセス元のグローバル IP を表示 |
+| `make whoami` | 現在の AWS 認証情報 |
+| `make exec` | Forgejo コンテナに入る（SSH 鍵不要） |
+| `make output` | すべての output |
+| `make backend` | `backend.hcl` を手動で再生成（通常は不要） |
+| `make fmt` / `make validate` | 整形・構文チェック |
+| `make destroy` | 削除（`prevent_destroy` のリソースは残ります） |
 
 ## アクセス方法
 

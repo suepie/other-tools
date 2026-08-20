@@ -7,6 +7,11 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 5.70, < 7.0"
     }
+    # ecs/backend.hcl を自動生成するために使う
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
   }
 }
 
