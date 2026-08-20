@@ -15,6 +15,51 @@ resource "aws_kms_key" "forge" {
   description             = "${local.name_prefix} data encryption"
   enable_key_rotation     = true
   deletion_window_in_days = 7
+
+  # 既定ポリシーのままだと CloudWatch Logs がこの鍵を使えず、
+  # 暗号化されたロググループの作成が 400 で失敗します。
+  policy = data.aws_iam_policy_document.forge_kms.json
+}
+
+data "aws_iam_policy_document" "forge_kms" {
+  # 明示ポリシーを付けると既定ポリシーが置き換わるため、
+  # アカウントからの管理権限を必ず自分で書き戻す必要があります。
+  statement {
+    sid       = "EnableIAMUserPermissions"
+    actions   = ["kms:*"]
+    resources = ["*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
+
+  # CloudWatch Logs がロググループを暗号化するために必要。
+  # EncryptionContext で、このアカウントのロググループ用途に限定しています。
+  statement {
+    sid = "AllowCloudWatchLogs"
+
+    actions = [
+      "kms:Encrypt*",
+      "kms:Decrypt*",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:Describe*",
+    ]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${var.region}.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values   = ["arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:*"]
+    }
+  }
 }
 
 resource "aws_kms_alias" "forge" {

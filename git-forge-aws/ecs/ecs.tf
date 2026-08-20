@@ -117,16 +117,14 @@ resource "aws_ecs_capacity_provider" "managed" {
   depends_on = [aws_iam_role_policy_attachment.ecs_infrastructure]
 }
 
-resource "aws_ecs_cluster_capacity_providers" "this" {
-  cluster_name       = aws_ecs_cluster.this.name
-  capacity_providers = [aws_ecs_capacity_provider.managed.name]
-
-  default_capacity_provider_strategy {
-    capacity_provider = aws_ecs_capacity_provider.managed.name
-    weight            = 1
-    base              = 1
-  }
-}
+# PutClusterCapacityProviders による明示的な関連付けは行いません。
+#
+# Managed Instances のキャパシティプロバイダは cluster 引数付きで作成しており、
+# 「作成時に指定したクラスタ内でのみ利用可能になる」ため、作成時点で関連付けが
+# 済んでいます。そこへ重ねて関連付けようとすると 400 になります。
+#
+# 各サービスは capacity_provider_strategy を明示しているので、
+# クラスタ既定のストラテジも不要です。
 
 # ---- Forgejo 本体 --------------------------------------------------------
 
@@ -219,7 +217,7 @@ resource "aws_ecs_service" "forge" {
 
   depends_on = [
     aws_lb_listener.http,
-    aws_ecs_cluster_capacity_providers.this,
+    aws_ecs_capacity_provider.managed,
   ]
 }
 
@@ -320,7 +318,7 @@ resource "aws_ecs_service" "runner" {
 
   depends_on = [
     aws_ecs_service.forge,
-    aws_ecs_cluster_capacity_providers.this,
+    aws_ecs_capacity_provider.managed,
   ]
 }
 
