@@ -2,7 +2,7 @@
 	lock \
 	check whoami myip tools \
 	bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output backend \
-	init plan apply destroy output \
+	init reinit plan apply destroy output \
 	setup url creds exec logs status \
 	fmt validate clean
 
@@ -15,6 +15,18 @@ ECS_DIR       := ecs
 BACKEND_FILE  := $(ECS_DIR)/backend.hcl
 
 LOG_SINCE     ?= 10m
+
+# aws CLI を使うターゲット（status / logs / setup / creds / exec）のために、
+# ecs/terraform.tfvars の aws_profile を AWS_PROFILE として引き継ぐ。
+#
+# terraform は tfvars を直接読むので不要ですが、aws CLI は環境変数か --profile しか
+# 見ないため、ここで橋渡ししています。環境変数が既に設定されていればそちらが優先です。
+TFVARS_PROFILE := $(shell sed -n 's/^[[:space:]]*aws_profile[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' $(ECS_DIR)/terraform.tfvars 2>/dev/null | head -1)
+AWS_PROFILE    ?= $(TFVARS_PROFILE)
+
+ifneq ($(strip $(AWS_PROFILE)),)
+export AWS_PROFILE
+endif
 
 # .terraform.lock.hcl に入れるプラットフォーム。
 # devcontainer（Linux）と Windows ホストの両方で terraform を動かす場合に必要です。
@@ -46,9 +58,14 @@ tools: ## [check] ツールのバージョンを表示
 
 whoami: ## [check] 現在の AWS 認証情報を表示
 	@echo "--- 認証 ---"
-	@printf '  AWS_PROFILE = %s\n' "$${AWS_PROFILE:-(未設定。tfvars の aws_profile が使われます)}"
+ifeq ($(strip $(AWS_PROFILE)),)
+	@echo "  AWS_PROFILE = (未解決)"
+	@echo "  NG  ecs/terraform.tfvars に aws_profile を書くか、export AWS_PROFILE=<名前> してください"
+else
+	@printf '  AWS_PROFILE = %s\n' "$(AWS_PROFILE)"
 	@aws sts get-caller-identity --output table 2>&1 | sed 's/^/  /' || \
-		echo "  NG  認証できません。aws sso login --sso-session <名前> --no-browser"
+		echo "  NG  認証できません。aws sso login --sso-session <セッション名> --no-browser"
+endif
 
 myip: ## [check] アクセス元のグローバル IP を表示
 	@printf '%s/32\n' "$$(curl -s https://checkip.amazonaws.com)"
@@ -89,6 +106,13 @@ init: ## [terraform] 初期化（backend.hcl を使用）
 		exit 1; \
 	}
 	cd $(ECS_DIR) && terraform init -backend-config=backend.hcl
+
+reinit: ## [terraform] バックエンド設定が変わったときの再初期化（state 移行の確認を出さない）
+	@test -f $(BACKEND_FILE) || { \
+		echo "ERROR: $(BACKEND_FILE) がありません。先に 'make bootstrap-apply' を実行してください。"; \
+		exit 1; \
+	}
+	cd $(ECS_DIR) && terraform init -reconfigure -backend-config=backend.hcl
 
 plan: init ## [terraform] 変更確認
 	cd $(ECS_DIR) && terraform plan
@@ -141,7 +165,7 @@ lock: ## [dev] .terraform.lock.hcl を複数プラットフォーム分で再生
 	cd $(BOOTSTRAP_DIR) && terraform providers lock $(addprefix -platform=,$(TF_PLATFORMS))
 	cd $(ECS_DIR) && terraform providers lock $(addprefix -platform=,$(TF_PLATFORMS))
 	@echo ""
-	@echo "生成しました。.terraform.lock.hcl は必ずコミットしてください。"
+	@echo "生成しました（.gitignore 対象なのでコミットは不要です）。"
 
 fmt: ## [dev] Terraform ファイルを整形
 	terraform fmt -recursive
