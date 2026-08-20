@@ -78,7 +78,7 @@
 
 | 変数 | 何を書くか | 例 |
 | --- | --- | --- |
-| `project` | プロジェクト識別子。全リソース名の接頭辞。英小文字・数字・ハイフンで 2〜31 文字 | `"project-a"` |
+| `project` | プロジェクト識別子。英小文字・数字・ハイフンで 2〜31 文字 | `"project-a"` |
 | `allowed_cidrs` | **接続を許可する固定 IP のリスト**。CloudFront 手前の WAF で制限します。`0.0.0.0/0` はバリデーションで弾かれます | `["203.0.113.10/32"]` |
 | `admin_email` | 初期管理者のメールアドレス | `"admin@example.com"` |
 
@@ -100,6 +100,26 @@ export AWS_PROFILE=orga-project-a
 ```
 
 **URL は CloudFront が払い出す `https://xxxxx.cloudfront.net/` になります。** ドメインの取得も DNS レコードの作成も不要です。
+
+### リソースの命名
+
+同じアカウントに別のスタックを置いても見分けが付くよう、**`project` + `component`** を接頭辞にしています。`component` の既定値は `git` です。
+
+| リソース | 名前 |
+| --- | --- |
+| VPC / IGW / サブネット | `project-a-git-vpc` / `-igw` / `-public-0` |
+| ALB / ターゲットグループ / ECS クラスタ / RDS / EFS | `project-a-git` |
+| セキュリティグループ | `project-a-git-alb` / `-ecs-instance` / `-efs` / `-db` |
+| IAM ロール | `project-a-git-task` / `-task-execution` / `-ecs-instance` |
+| S3（オブジェクト） | `project-a-git-objects-<アカウントID>` |
+| Secrets Manager | `project-a-git/app` / `project-a-git/admin` |
+| CloudWatch Logs | `/ecs/project-a-git` |
+
+`component` を変えれば別用途のスタックを同居させられます（`bootstrap` と `ecs` で同じ値にしてください）。
+
+> ⚠️ **`project` と `component` を合わせた長さは 32 文字までです。** ALB とターゲットグループの名前の上限で、超えると `terraform plan` の段階で止まります（`ecs/alb.tf` の precondition）。
+
+**tfstate のバケットはアカウント共通**（`project-a-tfstate-<アカウントID>`）で、スタックごとに**キー**で分けています（`git/terraform.tfstate`）。1アカウントに複数スタックを置いてもバケットは1つで済みます。
 
 ## 前提
 

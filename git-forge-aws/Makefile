@@ -55,10 +55,12 @@ myip: ## [check] アクセス元のグローバル IP を表示
 bootstrap-init: ## [bootstrap] 初期化
 	cd $(BOOTSTRAP_DIR) && terraform init
 
-bootstrap-plan: ## [bootstrap] 変更確認
+# init を前提にしておく。プロバイダ追加時に "apply だけ実行して失敗" を防ぐため
+# （terraform init は冪等なので、変更がなければすぐ終わります）
+bootstrap-plan: bootstrap-init ## [bootstrap] 変更確認
 	cd $(BOOTSTRAP_DIR) && terraform plan
 
-bootstrap-apply: ## [bootstrap] 適用（ecs/backend.hcl も自動生成される）
+bootstrap-apply: bootstrap-init ## [bootstrap] 適用（ecs/backend.hcl も自動生成される）
 	cd $(BOOTSTRAP_DIR) && terraform apply
 	@echo ""
 	@echo "--- 生成された $(BACKEND_FILE) ---"
@@ -83,10 +85,10 @@ init: ## [terraform] 初期化（backend.hcl を使用）
 	}
 	cd $(ECS_DIR) && terraform init -backend-config=backend.hcl
 
-plan: ## [terraform] 変更確認
+plan: init ## [terraform] 変更確認
 	cd $(ECS_DIR) && terraform plan
 
-apply: ## [terraform] 適用（初回は 25〜35 分かかります）
+apply: init ## [terraform] 適用（初回は 25〜35 分かかります）
 	cd $(ECS_DIR) && terraform apply
 
 destroy: ## [terraform] 削除（prevent_destroy のリソースは残ります）

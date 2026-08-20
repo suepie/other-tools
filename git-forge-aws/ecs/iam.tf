@@ -45,7 +45,7 @@ data "aws_iam_policy_document" "assume_ec2" {
 # ---- Managed Instances のインフラロール ----------------------------------
 
 resource "aws_iam_role" "ecs_infrastructure" {
-  name               = "${var.project}-ecs-infrastructure"
+  name               = "${local.name_prefix}-ecs-infrastructure"
   assume_role_policy = data.aws_iam_policy_document.assume_ecs.json
 }
 
@@ -59,7 +59,7 @@ resource "aws_iam_role_policy_attachment" "ecs_infrastructure" {
 # ---- インスタンス自身のロール --------------------------------------------
 
 resource "aws_iam_role" "ecs_instance" {
-  name               = "${var.project}-ecs-instance"
+  name               = "${local.name_prefix}-ecs-instance"
   assume_role_policy = data.aws_iam_policy_document.assume_ec2.json
 }
 
@@ -75,14 +75,14 @@ resource "aws_iam_role_policy_attachment" "ecs_instance_ssm" {
 }
 
 resource "aws_iam_instance_profile" "ecs_instance" {
-  name = "${var.project}-ecs-instance"
+  name = "${local.name_prefix}-ecs-instance"
   role = aws_iam_role.ecs_instance.name
 }
 
 # ---- タスク実行ロール ----------------------------------------------------
 
 resource "aws_iam_role" "task_execution" {
-  name               = "${var.project}-forge-task-execution"
+  name               = "${local.name_prefix}-task-execution"
   assume_role_policy = data.aws_iam_policy_document.assume_ecs_tasks.json
 }
 
@@ -107,7 +107,7 @@ data "aws_iam_policy_document" "task_execution_secrets" {
 }
 
 resource "aws_iam_role_policy" "task_execution_secrets" {
-  name   = "${var.project}-forge-task-execution-secrets"
+  name   = "${local.name_prefix}-task-execution-secrets"
   role   = aws_iam_role.task_execution.id
   policy = data.aws_iam_policy_document.task_execution_secrets.json
 }
@@ -115,7 +115,7 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
 # ---- タスクロール --------------------------------------------------------
 
 resource "aws_iam_role" "task" {
-  name               = "${var.project}-forge-task"
+  name               = "${local.name_prefix}-task"
   assume_role_policy = data.aws_iam_policy_document.assume_ecs_tasks.json
 }
 
@@ -150,7 +150,7 @@ data "aws_iam_policy_document" "task" {
 }
 
 resource "aws_iam_role_policy" "task" {
-  name   = "${var.project}-forge-task"
+  name   = "${local.name_prefix}-task"
   role   = aws_iam_role.task.id
   policy = data.aws_iam_policy_document.task.json
 }

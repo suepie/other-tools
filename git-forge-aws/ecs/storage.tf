@@ -12,20 +12,20 @@
 # プロジェクト専用の CMK。EFS / S3 / RDS / Secrets をこれで暗号化することで、
 # 「鍵を分ける = プロジェクトを分ける」を担保します。
 resource "aws_kms_key" "forge" {
-  description             = "${var.project} forge data encryption"
+  description             = "${local.name_prefix} data encryption"
   enable_key_rotation     = true
   deletion_window_in_days = 7
 }
 
 resource "aws_kms_alias" "forge" {
-  name          = "alias/${var.project}-forge"
+  name          = "alias/${local.name_prefix}"
   target_key_id = aws_kms_key.forge.key_id
 }
 
 # ---- EFS -----------------------------------------------------------------
 
 resource "aws_efs_file_system" "forge" {
-  creation_token = "${var.project}-forge"
+  creation_token = local.name_prefix
   encrypted      = true
   kms_key_id     = aws_kms_key.forge.arn
 
@@ -40,7 +40,7 @@ resource "aws_efs_file_system" "forge" {
     transition_to_primary_storage_class = "AFTER_1_ACCESS"
   }
 
-  tags = { Name = "${var.project}-forge" }
+  tags = { Name = "${local.name_prefix}" }
 }
 
 resource "aws_efs_mount_target" "forge" {
@@ -70,7 +70,7 @@ resource "aws_efs_access_point" "forge" {
     }
   }
 
-  tags = { Name = "${var.project}-forge-data" }
+  tags = { Name = "${local.name_prefix}-data" }
 }
 
 # EFS のバックアップ（AWS Backup の既定プラン）
@@ -85,7 +85,7 @@ resource "aws_efs_backup_policy" "forge" {
 # ---- S3 ------------------------------------------------------------------
 
 resource "aws_s3_bucket" "objects" {
-  bucket = "${var.project}-forge-objects-${data.aws_caller_identity.current.account_id}"
+  bucket = "${local.name_prefix}-objects-${data.aws_caller_identity.current.account_id}"
 
   lifecycle {
     prevent_destroy = true
@@ -144,12 +144,12 @@ resource "aws_s3_bucket_policy" "objects" {
 # ---- RDS -----------------------------------------------------------------
 
 resource "aws_db_subnet_group" "forge" {
-  name       = "${var.project}-forge"
+  name       = local.name_prefix
   subnet_ids = aws_subnet.private[*].id
 }
 
 resource "aws_db_instance" "forge" {
-  identifier     = "${var.project}-forge"
+  identifier     = local.name_prefix
   engine         = "postgres"
   engine_version = var.db_engine_version
   instance_class = var.db_instance_class
@@ -175,9 +175,9 @@ resource "aws_db_instance" "forge" {
   auto_minor_version_upgrade = true
   deletion_protection        = true
   skip_final_snapshot        = false
-  final_snapshot_identifier  = "${var.project}-forge-final"
+  final_snapshot_identifier  = "${local.name_prefix}-final"
 
   performance_insights_enabled = false
 
-  tags = { Name = "${var.project}-forge" }
+  tags = { Name = "${local.name_prefix}" }
 }

@@ -19,7 +19,7 @@ locals {
 
 resource "aws_cloudfront_vpc_origin" "forge" {
   vpc_origin_endpoint_config {
-    name                   = "${var.project}-forge"
+    name                   = local.name_prefix
     arn                    = aws_lb.forge.arn
     http_port              = 80
     https_port             = 443
@@ -38,7 +38,7 @@ resource "aws_cloudfront_vpc_origin" "forge" {
     delete = "30m"
   }
 
-  tags = { Name = "${var.project}-forge" }
+  tags = { Name = "${local.name_prefix}" }
 }
 
 # ---- WAF（IP 制限） ------------------------------------------------------
@@ -47,8 +47,8 @@ resource "aws_cloudfront_vpc_origin" "forge" {
 resource "aws_wafv2_ip_set" "allowed" {
   provider = aws.us_east_1
 
-  name               = "${var.project}-forge-allowed"
-  description        = "Source IPs allowed to reach ${var.project} forge"
+  name               = "${local.name_prefix}-allowed"
+  description        = "Source IPs allowed to reach ${local.name_prefix}"
   scope              = "CLOUDFRONT"
   ip_address_version = "IPV4"
   addresses          = var.allowed_cidrs
@@ -57,7 +57,7 @@ resource "aws_wafv2_ip_set" "allowed" {
 resource "aws_wafv2_web_acl" "forge" {
   provider = aws.us_east_1
 
-  name        = "${var.project}-forge"
+  name        = local.name_prefix
   description = "Allow only listed source IPs"
   scope       = "CLOUDFRONT"
 
@@ -82,14 +82,14 @@ resource "aws_wafv2_web_acl" "forge" {
 
     visibility_config {
       cloudwatch_metrics_enabled = true
-      metric_name                = "${replace(var.project, "-", "")}AllowedIps"
+      metric_name                = "${local.metric_prefix}AllowedIps"
       sampled_requests_enabled   = false
     }
   }
 
   visibility_config {
     cloudwatch_metrics_enabled = true
-    metric_name                = "${replace(var.project, "-", "")}Forge"
+    metric_name                = "${local.metric_prefix}Forge"
     sampled_requests_enabled   = false
   }
 }
@@ -108,7 +108,7 @@ data "aws_cloudfront_origin_request_policy" "all_viewer" {
 
 resource "aws_cloudfront_distribution" "forge" {
   enabled         = true
-  comment         = "${var.project} forge"
+  comment         = local.name_prefix
   price_class     = var.cloudfront_price_class
   http_version    = "http2and3"
   web_acl_id      = aws_wafv2_web_acl.forge.arn
@@ -152,5 +152,5 @@ resource "aws_cloudfront_distribution" "forge" {
     minimum_protocol_version       = "TLSv1.2_2021"
   }
 
-  tags = { Name = "${var.project}-forge" }
+  tags = { Name = "${local.name_prefix}" }
 }

@@ -14,7 +14,8 @@ locals {
   backend_config = join("\n", concat(
     [
       "bucket       = \"${aws_s3_bucket.tfstate.id}\"",
-      "key          = \"forge/terraform.tfstate\"",
+      # バケットはアカウント共通。スタックはキーで分ける
+      "key          = \"${var.component}/terraform.tfstate\"",
       "region       = \"${var.region}\"",
       "encrypt      = true",
       "kms_key_id   = \"${aws_kms_key.tfstate.arn}\"",

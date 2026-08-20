@@ -7,7 +7,7 @@
 #
 
 resource "aws_lb" "forge" {
-  name               = "${var.project}-forge"
+  name               = local.name_prefix
   load_balancer_type = "application"
   internal           = true
   security_groups    = [aws_security_group.alb.id]
@@ -17,10 +17,19 @@ resource "aws_lb" "forge" {
   # CloudFront 側の origin_read_timeout より長くしておく
   idle_timeout               = 300
   drop_invalid_header_fields = true
+
+  # ALB とターゲットグループの名前は 32 文字までという制約がある。
+  # AWS 側の分かりにくいエラーになる前に、plan の段階で止める。
+  lifecycle {
+    precondition {
+      condition     = length(local.name_prefix) <= 32
+      error_message = "project と component を合わせた長さ（ハイフン込み）が 32 文字を超えています（現在 ${length(local.name_prefix)} 文字）。ALB 名の上限です。短くしてください。"
+    }
+  }
 }
 
 resource "aws_lb_target_group" "forge" {
-  name        = "${var.project}-forge"
+  name        = local.name_prefix
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = aws_vpc.this.id

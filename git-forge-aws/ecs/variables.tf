@@ -8,6 +8,26 @@ variable "project" {
   }
 }
 
+variable "component" {
+  description = <<-EOT
+    用途を表す識別子。リソース名が「project-component-...」になります。
+
+    同じアカウントに別のスタックを置いたときに見分けが付くようにするためのものです。
+    既定の "git" なら project-a-git-vpc のようになります。
+  EOT
+  type        = string
+  default     = "git"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{0,15}$", var.component))
+    error_message = "component は英小文字・数字・ハイフンで 1〜16 文字にしてください。"
+  }
+
+  # project との合計長（ALB 名の 32 文字上限）は alb.tf の precondition で検査します。
+  # 変数バリデーションから他の変数を参照するのは Terraform 1.9 以降に限られるうえ、
+  # 制約が効く場所の近くに置いたほうが分かりやすいためです。
+}
+
 variable "region" {
   description = "リソースを作成するリージョン。ECS Managed Instances 対応リージョンである必要があります"
   type        = string

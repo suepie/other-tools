@@ -43,7 +43,7 @@ resource "random_id" "runner_secret" {
 #   将来 Forgejo が IAM ロールに対応したら、このユーザーは削除できます。
 
 resource "aws_iam_user" "s3" {
-  name = "${var.project}-forge-s3"
+  name = "${local.name_prefix}-s3"
   path = "/service/"
 }
 
@@ -78,7 +78,7 @@ data "aws_iam_policy_document" "s3_user" {
 }
 
 resource "aws_iam_user_policy" "s3" {
-  name   = "${var.project}-forge-s3"
+  name   = "${local.name_prefix}-s3"
   user   = aws_iam_user.s3.name
   policy = data.aws_iam_policy_document.s3_user.json
 }
@@ -91,8 +91,8 @@ resource "aws_iam_access_key" "s3" {
 
 # アプリが起動時に読む値をまとめる。ECS のコンテナ定義からは JSON キー単位で参照する
 resource "aws_secretsmanager_secret" "app" {
-  name                    = "${var.project}/forge/app"
-  description             = "${var.project} forge runtime secrets"
+  name                    = "${local.name_prefix}/app"
+  description             = "${local.name_prefix} runtime secrets"
   kms_key_id              = aws_kms_key.forge.arn
   recovery_window_in_days = var.secret_recovery_window_days
 }
@@ -111,8 +111,8 @@ resource "aws_secretsmanager_secret_version" "app" {
 
 # 人間が取り出す用（初期ログイン情報）。上とは用途を分けておく
 resource "aws_secretsmanager_secret" "admin" {
-  name                    = "${var.project}/forge/admin"
-  description             = "${var.project} forge initial admin login"
+  name                    = "${local.name_prefix}/admin"
+  description             = "${local.name_prefix} initial admin login"
   kms_key_id              = aws_kms_key.forge.arn
   recovery_window_in_days = var.secret_recovery_window_days
 }

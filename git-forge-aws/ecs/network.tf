@@ -25,7 +25,7 @@ resource "aws_vpc" "this" {
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = { Name = "${var.project}-vpc" }
+  tags = { Name = "${local.name_prefix}-vpc" }
 }
 
 # VPC オリジンの前提条件。ルーティングには使われませんが、
@@ -33,7 +33,7 @@ resource "aws_vpc" "this" {
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
-  tags = { Name = "${var.project}-igw" }
+  tags = { Name = "${local.name_prefix}-igw" }
 }
 
 resource "aws_subnet" "public" {
@@ -44,7 +44,7 @@ resource "aws_subnet" "public" {
   availability_zone       = local.usable_azs[count.index]
   map_public_ip_on_launch = true
 
-  tags = { Name = "${var.project}-public-${count.index}" }
+  tags = { Name = "${local.name_prefix}-public-${count.index}" }
 }
 
 # 内部 ALB / RDS / CloudFront の ENI を置く。インターネットへの経路は持たせない
@@ -55,7 +55,7 @@ resource "aws_subnet" "private" {
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index + 10)
   availability_zone = local.usable_azs[count.index]
 
-  tags = { Name = "${var.project}-private-${count.index}" }
+  tags = { Name = "${local.name_prefix}-private-${count.index}" }
 }
 
 resource "aws_route_table" "public" {
@@ -66,7 +66,7 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.this.id
   }
 
-  tags = { Name = "${var.project}-public" }
+  tags = { Name = "${local.name_prefix}-public" }
 }
 
 resource "aws_route_table_association" "public" {
@@ -84,11 +84,11 @@ data "aws_ec2_managed_prefix_list" "cloudfront_origin_facing" {
 }
 
 resource "aws_security_group" "alb" {
-  name        = "${var.project}-alb"
+  name        = "${local.name_prefix}-alb"
   description = "Internal ALB, reachable only from CloudFront VPC origin"
   vpc_id      = aws_vpc.this.id
 
-  tags = { Name = "${var.project}-alb" }
+  tags = { Name = "${local.name_prefix}-alb" }
 }
 
 # CloudFront 以外からは届きません。
@@ -114,11 +114,11 @@ resource "aws_vpc_security_group_egress_rule" "alb_to_instance" {
 
 # ECS Managed Instances が起動するインスタンス
 resource "aws_security_group" "instance" {
-  name        = "${var.project}-ecs-instance"
+  name        = "${local.name_prefix}-ecs-instance"
   description = "ECS managed instances for forge and runner"
   vpc_id      = aws_vpc.this.id
 
-  tags = { Name = "${var.project}-ecs-instance" }
+  tags = { Name = "${local.name_prefix}-ecs-instance" }
 }
 
 resource "aws_vpc_security_group_ingress_rule" "instance_from_alb" {
@@ -139,11 +139,11 @@ resource "aws_vpc_security_group_egress_rule" "instance_all" {
 
 # EFS: インスタンスからの NFS のみ
 resource "aws_security_group" "efs" {
-  name        = "${var.project}-efs"
+  name        = "${local.name_prefix}-efs"
   description = "EFS mount targets"
   vpc_id      = aws_vpc.this.id
 
-  tags = { Name = "${var.project}-efs" }
+  tags = { Name = "${local.name_prefix}-efs" }
 }
 
 resource "aws_vpc_security_group_ingress_rule" "efs_from_instance" {
@@ -157,11 +157,11 @@ resource "aws_vpc_security_group_ingress_rule" "efs_from_instance" {
 
 # RDS: インスタンスからの PostgreSQL のみ
 resource "aws_security_group" "db" {
-  name        = "${var.project}-db"
+  name        = "${local.name_prefix}-db"
   description = "RDS PostgreSQL"
   vpc_id      = aws_vpc.this.id
 
-  tags = { Name = "${var.project}-db" }
+  tags = { Name = "${local.name_prefix}-db" }
 }
 
 resource "aws_vpc_security_group_ingress_rule" "db_from_instance" {

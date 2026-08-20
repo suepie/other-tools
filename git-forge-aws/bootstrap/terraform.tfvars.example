@@ -8,6 +8,10 @@
 # ecs/terraform.tfvars の project と同じ値にしてください。
 project = "project-a"
 
+# 用途を表す識別子。リソース名が project-a-git-... になります。
+# 同じアカウントに別スタックを置くときに見分けが付きます（bootstrap と ecs で同じ値に）。
+component = "git"
+
 # リージョン。ecs 側と同じにしてください。
 region = "ap-northeast-1"
 

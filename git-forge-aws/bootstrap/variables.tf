@@ -8,6 +8,22 @@ variable "project" {
   }
 }
 
+variable "component" {
+  description = <<-EOT
+    用途を表す識別子。tfstate のキー（<component>/terraform.tfstate）になります。
+
+    バケット自体はアカウント共通で使い回し、スタックごとにキーで分けます。
+    ecs 側の component と同じ値にしてください。
+  EOT
+  type        = string
+  default     = "git"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{0,15}$", var.component))
+    error_message = "component は英小文字・数字・ハイフンで 1〜16 文字にしてください。"
+  }
+}
+
 variable "region" {
   description = "リソースを作成するリージョン"
   type        = string

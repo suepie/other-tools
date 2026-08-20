@@ -57,7 +57,7 @@ locals {
 # ---- ログ ----------------------------------------------------------------
 
 resource "aws_cloudwatch_log_group" "forge" {
-  name              = "/ecs/${var.project}/forge"
+  name              = "/ecs/${local.name_prefix}"
   retention_in_days = var.log_retention_days
   kms_key_id        = aws_kms_key.forge.arn
 }
@@ -65,7 +65,7 @@ resource "aws_cloudwatch_log_group" "forge" {
 # ---- クラスタ ------------------------------------------------------------
 
 resource "aws_ecs_cluster" "this" {
-  name = "${var.project}-forge"
+  name = local.name_prefix
 
   setting {
     name  = "containerInsights"
@@ -79,7 +79,7 @@ resource "aws_ecs_cluster" "this" {
 # EC2 と同じ能力を持つので、runner が必要とする docker.sock のマウントも使えます。
 
 resource "aws_ecs_capacity_provider" "managed" {
-  name    = "${var.project}-managed"
+  name    = "${local.name_prefix}-managed"
   cluster = aws_ecs_cluster.this.name
 
   managed_instances_provider {
@@ -131,7 +131,7 @@ resource "aws_ecs_cluster_capacity_providers" "this" {
 # ---- Forgejo 本体 --------------------------------------------------------
 
 resource "aws_ecs_task_definition" "forge" {
-  family             = "${var.project}-forge"
+  family             = local.name_prefix
   network_mode       = "host"
   execution_role_arn = aws_iam_role.task_execution.arn
   task_role_arn      = aws_iam_role.task.arn
@@ -193,7 +193,7 @@ resource "aws_ecs_task_definition" "forge" {
 }
 
 resource "aws_ecs_service" "forge" {
-  name            = "${var.project}-forge"
+  name            = local.name_prefix
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.forge.arn
   desired_count   = 1
@@ -232,7 +232,7 @@ resource "aws_ecs_service" "forge" {
 resource "aws_ecs_task_definition" "runner" {
   count = var.enable_runner ? 1 : 0
 
-  family             = "${var.project}-forge-runner"
+  family             = "${local.name_prefix}-runner"
   network_mode       = "host"
   execution_role_arn = aws_iam_role.task_execution.arn
   task_role_arn      = aws_iam_role.task.arn
@@ -303,7 +303,7 @@ resource "aws_ecs_task_definition" "runner" {
 resource "aws_ecs_service" "runner" {
   count = var.enable_runner ? 1 : 0
 
-  name            = "${var.project}-forge-runner"
+  name            = "${local.name_prefix}-runner"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.runner[0].arn
   desired_count   = 1
@@ -330,7 +330,7 @@ resource "aws_ecs_service" "runner" {
 # 一度だけ `aws ecs run-task` で実行してください（コマンドは outputs に出ます）。
 
 resource "aws_ecs_task_definition" "bootstrap" {
-  family             = "${var.project}-forge-bootstrap"
+  family             = "${local.name_prefix}-bootstrap"
   network_mode       = "host"
   execution_role_arn = aws_iam_role.task_execution.arn
   task_role_arn      = aws_iam_role.task.arn
