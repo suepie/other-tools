@@ -121,7 +121,7 @@ resource "aws_secretsmanager_secret_version" "admin" {
   secret_id = aws_secretsmanager_secret.admin.id
 
   secret_string = jsonencode({
-    url      = "https://${var.domain_name}/"
+    url      = local.forge_root_url
     username = var.admin_username
     password = random_password.admin.result
     email    = var.admin_email

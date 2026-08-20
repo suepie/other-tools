@@ -1,6 +1,21 @@
 output "forge_url" {
   description = "Forgejo の URL（allowed_cidrs からのみアクセス可）"
-  value       = "https://${var.domain_name}/"
+  value       = local.forge_root_url
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront ディストリビューション ID"
+  value       = aws_cloudfront_distribution.forge.id
+}
+
+output "waf_ip_set_name" {
+  description = "許可 IP を管理している WAF IP セット（us-east-1）"
+  value       = aws_wafv2_ip_set.allowed.name
+}
+
+output "origin_read_timeout" {
+  description = "オリジン応答タイムアウト（無通信が続いた時間の上限）"
+  value       = "${var.origin_read_timeout}s"
 }
 
 output "bootstrap_command" {

@@ -1,0 +1,10 @@
+.DS_Store
+
+# 社内 CA 証明書。環境ごとに各自で .devcontainer/certs/ に配置する
+*.pem
+*.crt
+
+# 認証情報が入りうるもの
+.env
+.env.*
+!.env.example

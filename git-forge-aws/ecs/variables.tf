@@ -36,14 +36,53 @@ variable "allowed_cidrs" {
 
 # ---- DNS / TLS -----------------------------------------------------------
 
-variable "domain_name" {
-  description = "Forgejo の FQDN。例: git-projecta.example.com"
-  type        = string
+# ---- CloudFront ----------------------------------------------------------
+#
+# 独自ドメインは使いません。CloudFront の既定ドメイン（*.cloudfront.net）には
+# 有効な TLS 証明書が最初から付いているため、ドメインを持たずに正規の HTTPS を張れます。
+
+variable "origin_read_timeout" {
+  description = <<-EOT
+    CloudFront がオリジンからの応答を待つ秒数（1〜120。既定の 30 は Git には短い）。
+
+    これは「合計時間」ではなく「無通信が続いた時間」です。データが流れ続けている限り
+    タイムアウトしません。効いてくるのは push 後にサーバが pack を展開・フック実行・
+    ref 更新する無通信区間で、大きな push だと 30 秒を超えます。
+    120 を超える値が必要ならクォータ引き上げを申請してください。
+  EOT
+  type        = number
+  default     = 120
+
+  validation {
+    condition     = var.origin_read_timeout >= 1 && var.origin_read_timeout <= 120
+    error_message = "origin_read_timeout は 1〜120 秒です。これを超える場合はクォータ引き上げ申請が必要です。"
+  }
 }
 
-variable "route53_zone_id" {
-  description = "domain_name を含む Route 53 ホストゾーン ID"
+variable "origin_keepalive_timeout" {
+  description = "CloudFront がオリジンとの接続を維持する秒数（1〜300）"
+  type        = number
+  default     = 60
+
+  validation {
+    condition     = var.origin_keepalive_timeout >= 1 && var.origin_keepalive_timeout <= 300
+    error_message = "origin_keepalive_timeout は 1〜300 秒です。"
+  }
+}
+
+variable "cloudfront_price_class" {
+  description = "CloudFront の価格クラス。日本国内利用なら PriceClass_200 で足ります"
   type        = string
+  default     = "PriceClass_200"
+}
+
+variable "excluded_az_ids" {
+  description = <<-EOT
+    使用しない AZ の ID。
+    CloudFront VPC オリジンは一部の AZ に非対応で、東京リージョンでは apne1-az3 が対象外です。
+  EOT
+  type        = list(string)
+  default     = ["apne1-az3"]
 }
 
 # ---- コンピュート --------------------------------------------------------

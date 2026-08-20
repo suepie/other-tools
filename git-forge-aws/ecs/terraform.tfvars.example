@@ -7,21 +7,28 @@
 project = "project-a"
 region  = "ap-northeast-1"
 
-# 接続を許可する固定 IP。ここが唯一の入口です。
+# 接続を許可する固定 IP。CloudFront 手前の WAF で制限します。
 allowed_cidrs = [
   "203.0.113.10/32",  # 本社
   "198.51.100.20/32", # データセンタ
 ]
 
-# FQDN と、それを含む Route 53 ホストゾーン ID
-domain_name     = "git-project-a.example.com"
-route53_zone_id = "Z0123456789ABCDEFGHIJ"
+# URL は CloudFront の既定ドメイン（https://xxxxx.cloudfront.net/）になります。
+# 独自ドメインも DNS 設定も不要です。apply 後 `terraform output forge_url` で確認できます。
 
 # 初期管理者。パスワードは Terraform が生成して Secrets Manager に入れます。
 admin_username = "forgeadmin"
 admin_email    = "admin@example.com"
 
 # ---- 任意 ----------------------------------------------------------------
+
+# CloudFront がオリジンの応答を待つ秒数（1〜120）。既定 120。
+# 「無通信が続いた時間」の上限で、合計時間ではありません。
+# 大きな push でサーバ側処理が長い場合に効きます。
+# origin_read_timeout = 120
+
+# 日本国内利用なら PriceClass_200 で足ります
+# cloudfront_price_class = "PriceClass_200"
 
 # Managed Instances が選ぶインスタンスの下限。CI が重いなら上げてください。
 # instance_vcpu_min       = 2

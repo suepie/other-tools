@@ -1,0 +1,65 @@
+{
+  "name": "other-tools",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    // git-forge-aws は Terraform 1.11 以降が必要（S3 ネイティブロック）
+    "ghcr.io/devcontainers/features/terraform:1": {
+      "version": "latest"
+    },
+    // network-measure / ai-api-measure / har-measure は PowerShell スクリプト
+    "ghcr.io/devcontainers/features/powershell:1": {},
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "moby": false
+    }
+  },
+
+  // Windows では HOME が空で USERPROFILE が入るため、連結すると両対応になります。
+  // ★ホスト側に .aws / .claude が存在しないとコンテナ起動に失敗します。
+  //   Windows なら事前に:  mkdir %USERPROFILE%\.aws  %USERPROFILE%\.claude
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.aws,target=/home/node/.aws,type=bind",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/home/node/.claude,type=bind"
+  ],
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropics.claude-code",
+        "ms-vscode.powershell",
+        "hashicorp.terraform",
+        "ms-azuretools.vscode-docker",
+        "bierner.markdown-mermaid",
+        "eamodio.gitlens",
+        "editorconfig.editorconfig",
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "files.eol": "\n",
+        "[terraform]": {
+          "editor.defaultFormatter": "hashicorp.terraform"
+        },
+        "[powershell]": {
+          "editor.defaultFormatter": "ms-vscode.powershell",
+          // Windows PowerShell 5.1 は BOM がないと日本語を ANSI と誤認するため、
+          // .ps1 は BOM 付き UTF-8 で保存する
+          "files.encoding": "utf8bom"
+        }
+      }
+    }
+  },
+
+  // Forgejo をローカルで試すとき用
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": { "label": "Forgejo (local test)", "onAutoForward": "notify" }
+  },
+
+  "remoteUser": "node"
+}

@@ -28,3 +28,17 @@ provider "aws" {
     }
   }
 }
+
+# CloudFront スコープの WAF は us-east-1 にしか作れないため、別プロバイダが必要
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      Project   = var.project
+      ManagedBy = "terraform"
+      Stack     = "forge-ecs"
+    }
+  }
+}

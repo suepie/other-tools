@@ -1,0 +1,19 @@
+# 改行コードは LF に正規化する。
+# Windows から編集しても、コミットされる内容は環境によらず同じになります。
+* text=auto eol=lf
+
+# PowerShell スクリプトも LF。PowerShell 5.1 / 7 とも LF を問題なく解釈します。
+# なお BOM は Git の管理対象外なので、この設定で失われることはありません
+# （.ps1 は BOM 付き UTF-8 のままにしてください。5.1 が日本語を ANSI と誤認するのを防ぐため）。
+*.ps1 text eol=lf
+
+# Linux 上で実行されるもの
+*.sh       text eol=lf
+*.tftpl    text eol=lf
+
+# バイナリ
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.pdf  binary
+*.har  binary

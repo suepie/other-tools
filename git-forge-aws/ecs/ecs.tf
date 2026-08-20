@@ -17,8 +17,12 @@ locals {
     # インストールウィザードを飛ばす（管理者は bootstrap タスクで作成）
     { name = "FORGEJO__security__INSTALL_LOCK", value = "true" },
 
-    { name = "FORGEJO__server__ROOT_URL", value = "https://${var.domain_name}/" },
-    { name = "FORGEJO__server__DOMAIN", value = var.domain_name },
+    # CloudFront の既定ドメイン（*.cloudfront.net）が公開 URL になる
+    { name = "FORGEJO__server__ROOT_URL", value = local.forge_root_url },
+    { name = "FORGEJO__server__DOMAIN", value = local.forge_host },
+    # TLS は CloudFront で終端し、オリジンへは HTTP で来る。
+    # X-Forwarded-Proto を見て「元は HTTPS」と判断させる
+    { name = "FORGEJO__server__PROTOCOL", value = "http" },
     { name = "FORGEJO__server__HTTP_PORT", value = "3000" },
     # Git は HTTPS のみ。SSH を閉じることで公開ポートを減らす
     { name = "FORGEJO__server__DISABLE_SSH", value = "true" },
@@ -214,7 +218,7 @@ resource "aws_ecs_service" "forge" {
   }
 
   depends_on = [
-    aws_lb_listener.https,
+    aws_lb_listener.http,
     aws_ecs_cluster_capacity_providers.this,
   ]
 }
