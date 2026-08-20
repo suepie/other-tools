@@ -49,11 +49,33 @@ resource "aws_iam_role" "ecs_infrastructure" {
   assume_role_policy = data.aws_iam_policy_document.assume_ecs.json
 }
 
-# ★このマネージドポリシー名は ECS Managed Instances 用のものです。
-#   apply が権限エラーになる場合は、AWS のドキュメントで現行のポリシー名を確認してください。
 resource "aws_iam_role_policy_attachment" "ecs_infrastructure" {
   role       = aws_iam_role.ecs_infrastructure.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonECSInfrastructureRolePolicyForManagedInstances"
+}
+
+# マネージドポリシーには iam:PassRole が含まれていません。
+# 渡す先のロール ARN は利用者ごとに違うため、AWS 側で定義できないからです。
+#
+# これが無いと ECS がインスタンスを起動できず、
+#   UnauthorizedOperation: You are not authorized to perform iam:PassRole on ...
+# となってタスクが配置されません（サービスは ACTIVE のまま running が 0）。
+#
+# 渡せるロールをインスタンスロール 1 つに限定しているので、これで十分絞れています。
+# iam:PassedToService の条件は、ECS がどのサービス名で渡すかに依存して
+# かえって拒否される可能性があるため付けていません。
+data "aws_iam_policy_document" "ecs_infrastructure_passrole" {
+  statement {
+    sid       = "PassInstanceRoleToEc2"
+    actions   = ["iam:PassRole"]
+    resources = [aws_iam_role.ecs_instance.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "ecs_infrastructure_passrole" {
+  name   = "${local.name_prefix}-ecs-infrastructure-passrole"
+  role   = aws_iam_role.ecs_infrastructure.id
+  policy = data.aws_iam_policy_document.ecs_infrastructure_passrole.json
 }
 
 # ---- インスタンス自身のロール --------------------------------------------

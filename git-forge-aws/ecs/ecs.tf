@@ -114,7 +114,11 @@ resource "aws_ecs_capacity_provider" "managed" {
     }
   }
 
-  depends_on = [aws_iam_role_policy_attachment.ecs_infrastructure]
+  # PassRole の付与前にプロバイダが作られると、初回のインスタンス起動に失敗します
+  depends_on = [
+    aws_iam_role_policy_attachment.ecs_infrastructure,
+    aws_iam_role_policy.ecs_infrastructure_passrole,
+  ]
 }
 
 # PutClusterCapacityProviders による明示的な関連付けは行いません。
