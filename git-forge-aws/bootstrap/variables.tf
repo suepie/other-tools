@@ -13,3 +13,13 @@ variable "region" {
   type        = string
   default     = "ap-northeast-1"
 }
+
+variable "allowed_account_ids" {
+  description = <<-EOT
+    このスタックを適用してよい AWS アカウント ID のリスト。
+    指定すると、別アカウントの認証情報で実行したときにエラーで止まります。
+    ecs/ 側と同じ値にしてください。空にするとチェックしません。
+  EOT
+  type        = list(string)
+  default     = []
+}

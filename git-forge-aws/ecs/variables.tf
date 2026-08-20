@@ -14,6 +14,21 @@ variable "region" {
   default     = "ap-northeast-1"
 }
 
+variable "allowed_account_ids" {
+  description = <<-EOT
+    このスタックを適用してよい AWS アカウント ID のリスト。
+
+    複数アカウントを扱うときの誤適用防止です。ここに書いたアカウント以外の
+    認証情報で実行すると、Terraform がリソースを触る前にエラーで止まります。
+    AWS_PROFILE の切り替え忘れが事故にならなくなるので、指定を強く推奨します。
+
+    例: ["111111111111"]
+    空にするとチェックしません。
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 # ---- アクセス制限 --------------------------------------------------------
 
 variable "allowed_cidrs" {

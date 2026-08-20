@@ -82,6 +82,23 @@
 | `allowed_cidrs` | **接続を許可する固定 IP のリスト**。CloudFront 手前の WAF で制限します。`0.0.0.0/0` はバリデーションで弾かれます | `["203.0.113.10/32"]` |
 | `admin_email` | 初期管理者のメールアドレス | `"admin@example.com"` |
 
+### 複数アカウントを扱うなら `allowed_account_ids` も
+
+必須ではありませんが、**強く推奨します**。
+
+```hcl
+allowed_account_ids = ["111111111111"]
+```
+
+ここに書いたアカウント以外の認証情報で実行すると、**Terraform がリソースを触る前にエラーで停止**します。プロジェクトごとにアカウントを分ける構成では、`AWS_PROFILE` の切り替え忘れによる誤適用が最大のリスクなので、これで潰しておくのが確実です。`bootstrap` 側にも同じ値を書いてください。
+
+あわせて `direnv` で `.envrc` を置き、ディレクトリに入ったら自動で `AWS_PROFILE` が切り替わるようにしておくと事故が減ります。
+
+```bash
+# git-forge-aws/.envrc
+export AWS_PROFILE=orga-project-a
+```
+
 **URL は CloudFront が払い出す `https://xxxxx.cloudfront.net/` になります。** ドメインの取得も DNS レコードの作成も不要です。
 
 ## 前提

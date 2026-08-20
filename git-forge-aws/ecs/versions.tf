@@ -20,6 +20,9 @@ terraform {
 provider "aws" {
   region = var.region
 
+  # 別アカウントの認証情報で実行された場合、リソースを触る前に停止する
+  allowed_account_ids = length(var.allowed_account_ids) > 0 ? var.allowed_account_ids : null
+
   default_tags {
     tags = {
       Project   = var.project
@@ -33,6 +36,8 @@ provider "aws" {
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"
+
+  allowed_account_ids = length(var.allowed_account_ids) > 0 ? var.allowed_account_ids : null
 
   default_tags {
     tags = {

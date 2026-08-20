@@ -7,6 +7,11 @@
 project = "project-a"
 region  = "ap-northeast-1"
 
+# ★複数アカウントを扱うなら必ず指定してください。
+#   ここに書いたアカウント以外の認証情報で実行すると、リソースを触る前に停止します。
+#   AWS_PROFILE の切り替え忘れが事故になりません。
+allowed_account_ids = ["111111111111"]
+
 # 接続を許可する固定 IP。CloudFront 手前の WAF で制限します。
 allowed_cidrs = [
   "203.0.113.10/32",  # 本社
