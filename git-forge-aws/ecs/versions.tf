@@ -21,6 +21,7 @@ provider "aws" {
   region = var.region
 
   # 別アカウントの認証情報で実行された場合、リソースを触る前に停止する
+  profile             = var.aws_profile != "" ? var.aws_profile : null
   allowed_account_ids = length(var.allowed_account_ids) > 0 ? var.allowed_account_ids : null
 
   default_tags {
@@ -37,6 +38,7 @@ provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"
 
+  profile             = var.aws_profile != "" ? var.aws_profile : null
   allowed_account_ids = length(var.allowed_account_ids) > 0 ? var.allowed_account_ids : null
 
   default_tags {

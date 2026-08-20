@@ -13,6 +13,9 @@ terraform {
 provider "aws" {
   region = var.region
 
+  # 環境変数 AWS_PROFILE に依存しないよう、tfvars からも指定できるようにする
+  profile = var.aws_profile != "" ? var.aws_profile : null
+
   # 別アカウントの認証情報で実行された場合、リソースを触る前に停止する
   allowed_account_ids = length(var.allowed_account_ids) > 0 ? var.allowed_account_ids : null
 
