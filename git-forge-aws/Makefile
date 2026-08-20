@@ -3,7 +3,7 @@
 	check whoami myip tools \
 	bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output backend \
 	init reinit plan apply destroy output \
-	setup url creds exec logs status \
+	setup url creds exec logs status events instances tasks diag \
 	fmt validate clean
 
 # ==============================================================================
@@ -156,6 +156,49 @@ status: ## [forge] ECS サービスの状態を表示
 		aws ecs describe-services --cluster "$$cluster" --services $$services \
 			--query 'services[].{Name:serviceName,Status:status,Desired:desiredCount,Running:runningCount}' \
 			--output table
+
+events: ## [forge] サービスのイベントを表示（タスクが配置できない理由はここに出る）
+	@cd $(ECS_DIR) && \
+		cluster="$$(terraform output -raw cluster_name)"; \
+		for s in $$(terraform output -json service_names | tr -d '[]"' | tr ',' ' '); do \
+			echo "--- $$s ---"; \
+			aws ecs describe-services --cluster "$$cluster" --services "$$s" \
+				--query 'services[0].events[:10].[createdAt,message]' --output text; \
+			echo ""; \
+		done
+
+instances: ## [forge] クラスタに登録されているインスタンスを表示
+	@cd $(ECS_DIR) && \
+		cluster="$$(terraform output -raw cluster_name)"; \
+		echo "--- クラスタのキャパシティプロバイダ ---"; \
+		aws ecs describe-clusters --clusters "$$cluster" \
+			--query 'clusters[0].capacityProviders' --output text; \
+		echo ""; \
+		echo "--- 登録インスタンス ---"; \
+		arns="$$(aws ecs list-container-instances --cluster "$$cluster" --query 'containerInstanceArns' --output text)"; \
+		if [ -z "$$arns" ] || [ "$$arns" = "None" ]; then \
+			echo "  0 台。Managed Instances がまだ起動していないか、起動に失敗しています。"; \
+		else \
+			aws ecs describe-container-instances --cluster "$$cluster" --container-instances $$arns \
+				--query 'containerInstances[].{Id:ec2InstanceId,Status:status,Agent:agentConnected,Running:runningTasksCount}' \
+				--output table; \
+		fi
+
+tasks: ## [forge] タスクの状態と停止理由を表示
+	@cd $(ECS_DIR) && \
+		cluster="$$(terraform output -raw cluster_name)"; \
+		for st in RUNNING STOPPED; do \
+			echo "--- $$st ---"; \
+			arns="$$(aws ecs list-tasks --cluster "$$cluster" --desired-status $$st --query 'taskArns' --output text)"; \
+			if [ -z "$$arns" ] || [ "$$arns" = "None" ]; then echo "  なし"; else \
+				aws ecs describe-tasks --cluster "$$cluster" --tasks $$arns \
+					--query 'tasks[].{Def:taskDefinitionArn,Last:lastStatus,StopCode:stopCode,Reason:stoppedReason}' \
+					--output table; \
+			fi; \
+			echo ""; \
+		done
+
+diag: status instances events tasks ## [forge] 上記4つをまとめて実行
 
 # ==============================================================================
 # [dev] 開発用
