@@ -4,6 +4,11 @@
 *.pem
 *.crt
 
+# devcontainer が features を解決したときに自動生成するロックファイル。
+# 一般にはコミット推奨ですが、コンテナを起動する端末からコミットできない運用のため除外。
+# feature のバージョンは devcontainer.json の指定で担保します。
+.devcontainer/devcontainer-lock.json
+
 # 認証情報が入りうるもの
 .env
 .env.*

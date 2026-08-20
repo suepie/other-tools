@@ -1,4 +1,5 @@
 .PHONY: help \
+	lock \
 	check whoami myip tools \
 	bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output backend \
 	init plan apply destroy output \
@@ -14,6 +15,10 @@ ECS_DIR       := ecs
 BACKEND_FILE  := $(ECS_DIR)/backend.hcl
 
 LOG_SINCE     ?= 10m
+
+# .terraform.lock.hcl に入れるプラットフォーム。
+# devcontainer（Linux）と Windows ホストの両方で terraform を動かす場合に必要です。
+TF_PLATFORMS  ?= linux_amd64 linux_arm64 windows_amd64 darwin_arm64
 
 # ==============================================================================
 # [check] 事前確認
@@ -131,6 +136,12 @@ status: ## [forge] ECS サービスの状態を表示
 # ==============================================================================
 # [dev] 開発用
 # ==============================================================================
+
+lock: ## [dev] .terraform.lock.hcl を複数プラットフォーム分で再生成
+	cd $(BOOTSTRAP_DIR) && terraform providers lock $(addprefix -platform=,$(TF_PLATFORMS))
+	cd $(ECS_DIR) && terraform providers lock $(addprefix -platform=,$(TF_PLATFORMS))
+	@echo ""
+	@echo "生成しました。.terraform.lock.hcl は必ずコミットしてください。"
 
 fmt: ## [dev] Terraform ファイルを整形
 	terraform fmt -recursive

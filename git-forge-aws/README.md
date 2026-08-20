@@ -224,7 +224,25 @@ make creds    # ユーザー名とパスワード
 | `make exec` | Forgejo コンテナに入る（SSH 鍵不要） |
 | `make output` | すべての output |
 | `make backend` | `backend.hcl` を手動で再生成（通常は不要） |
+| `make lock` | `.terraform.lock.hcl` を複数プラットフォーム分で再生成 |
 | `make fmt` / `make validate` | 整形・構文チェック |
+
+## ロックファイルの扱い
+
+**`.terraform.lock.hcl` と `.devcontainer/devcontainer-lock.json` は `.gitignore` に入れています。**
+
+一般にはコミットが推奨されるファイルですが、この構成では実行環境（devcontainer / Windows）からコミットできない運用のため除外しています。プラットフォームごとにハッシュが異なるため、コミットしても差分が出続けるという事情もあります。
+
+**バージョンの担保は宣言側で行います。**
+
+| | 何で固定するか |
+| --- | --- |
+| Terraform プロバイダ | `versions.tf` の `version` 制約（`>= 6.15, < 7.0` など） |
+| devcontainer の feature | `devcontainer.json` の指定 |
+
+そのぶん **`terraform init` のたびにプロバイダのパッチバージョンが上がる可能性があります**。挙動が変わったと感じたら `terraform version` で確認してください。固定したい場合は `versions.tf` の制約を厳しくします。
+
+> ℹ️ 複数プラットフォーム分のハッシュを持つロックファイルが必要になった場合は `make lock` で生成できます（`TF_PLATFORMS` で対象を変更）。現状の運用では使いません。
 | `make destroy` | 削除（`prevent_destroy` のリソースは残ります） |
 
 ## アクセス方法
