@@ -141,7 +141,14 @@ variable "instance_vcpu_min" {
 }
 
 variable "instance_memory_mib_min" {
-  description = "Managed Instances が選ぶインスタンスの最小メモリ (MiB)"
+  description = <<-EOT
+    Managed Instances が選ぶインスタンスの最小メモリ (MiB)。
+
+    ★CI（enable_runner = true）を使うなら 8192 以上を推奨します。
+    ランナーが docker.sock 経由で起動するジョブコンテナは、ECS のタスクとは
+    別枠でホストのメモリを消費し、ECS の配置計算に含まれません。
+    4096 だと ECS 上は空きがあるように見えてビルドが OOM で落ちます。
+  EOT
   type        = number
   default     = 4096
 }

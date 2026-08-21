@@ -201,10 +201,18 @@ make apply
 forge サービスが安定してから実行します。
 
 ```bash
-make status   # RUNNING になっているか確認
+make status   # forge が Running=1 になっていることを確認
 make setup    # 管理者作成 + ランナー登録
 make logs     # bootstrap-done が出れば成功
+make status   # 数分後、runner も Running=1 になる
 ```
+
+> ℹ️ **`make setup` の前は runner の Running が 0 のままですが、これは正常です。**
+> ランナーは forge 側と同じシークレットを共有して登録する方式で、**forge 側への登録は `make setup` で行われます**。それまで runner は接続できずに終了と再起動を繰り返します。`make setup` 後、次の再起動で自動的に登録されて Running=1 になります。
+>
+> **待つべきなのは forge の Running=1 だけ**です。
+
+うまくいかないときは `make diag`（`status` / `instances` / `events` / `tasks` をまとめて実行）で原因を絞れます。
 
 ### 5. ログインする
 

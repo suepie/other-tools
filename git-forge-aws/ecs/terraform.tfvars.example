@@ -30,6 +30,26 @@ allowed_cidrs = [
 admin_username = "forgeadmin"
 admin_email    = "admin@example.com"
 
+# ---- コンピュート --------------------------------------------------------
+#
+# Managed Instances が選ぶインスタンスの下限です。
+#
+# ★CI を使うなら 8192 を推奨します。
+#   ランナーは docker.sock 経由でジョブごとにコンテナを起動しますが、
+#   そのジョブコンテナは ECS のタスクとは別枠でホストのメモリを消費します。
+#   ECS の配置計算に含まれないため、インスタンス側に余裕が必要です。
+#
+#   4096 のままだと、ECS 上は「空きあり」に見えるのにビルドが OOM で落ちる、
+#   という分かりにくい失敗をします。
+#
+#   4096 → 8192 でインスタンス費用が月 $30〜40 程度上がります。
+instance_vcpu_min       = 2
+instance_memory_mib_min = 8192
+
+# CI のビルド作業領域もここを使います。大きなリポジトリや
+# イメージビルドが多いなら増やしてください。
+instance_storage_gib = 100
+
 # ---- 任意 ----------------------------------------------------------------
 
 # CloudFront がオリジンの応答を待つ秒数（1〜120）。既定 120。
@@ -39,11 +59,6 @@ admin_email    = "admin@example.com"
 
 # 日本国内利用なら PriceClass_200 で足ります
 # cloudfront_price_class = "PriceClass_200"
-
-# Managed Instances が選ぶインスタンスの下限。CI が重いなら上げてください。
-# instance_vcpu_min       = 2
-# instance_memory_mib_min = 4096
-# instance_storage_gib    = 100
 
 # CI で x86 バイナリをビルドするなら Graviton を除外する
 # cpu_manufacturers = ["intel", "amd"]

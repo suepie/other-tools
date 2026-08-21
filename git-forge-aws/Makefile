@@ -3,7 +3,7 @@
 	check whoami myip tools \
 	bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output backend \
 	init reinit plan apply destroy output \
-	setup url creds exec logs status events instances tasks diag \
+	setup url creds exec logs status events instances tasks diag recycle \
 	fmt validate clean
 
 # ==============================================================================
@@ -131,7 +131,8 @@ output: ## [terraform] output を表示
 # ==============================================================================
 
 setup: ## [forge] 初期セットアップ（管理者作成 + ランナー登録）を1回だけ実行
-	@echo "forge サービスが安定してから実行してください。"
+	@echo "forge が Running=1 になってから実行してください。"
+	@echo "（runner はこの setup で forge 側に登録されるため、実行前は Running=0 が正常です）"
 	cd $(ECS_DIR) && eval "$$(terraform output -raw bootstrap_command)"
 	@echo ""
 	@echo "進捗は 'make logs' で確認してください（bootstrap-done が出れば成功）。"
@@ -199,6 +200,24 @@ tasks: ## [forge] タスクの状態と停止理由を表示
 		done
 
 diag: status instances events tasks ## [forge] 上記4つをまとめて実行
+
+recycle: ## [forge] インスタンスを入れ替える（インスタンス要件の変更を即時反映させたいとき）
+	@cd $(ECS_DIR) && \
+		cluster="$$(terraform output -raw cluster_name)"; \
+		arns="$$(aws ecs list-container-instances --cluster "$$cluster" --query 'containerInstanceArns' --output text)"; \
+		if [ -z "$$arns" ] || [ "$$arns" = "None" ]; then echo "インスタンスが登録されていません。"; exit 1; fi; \
+		ec2="$$(aws ecs describe-container-instances --cluster "$$cluster" --container-instances $$arns \
+			--query 'containerInstances[].ec2InstanceId' --output text)"; \
+		echo "対象: $$ec2"; \
+		echo "終了させると Managed Instances が新しい要件で作り直します。"; \
+		echo "リポジトリは EFS、メタデータは RDS、成果物は S3 にあるのでデータは失われません。"; \
+		echo "ただしタスク再配置の間、数分アクセスできなくなります。"; \
+		printf '入れ替えますか？ [y/N] '; read ans; \
+		[ "$$ans" = "y" ] || { echo "中止しました。"; exit 1; }; \
+		aws ec2 terminate-instances --instance-ids $$ec2 \
+			--query 'TerminatingInstances[].{Id:InstanceId,State:CurrentState.Name}' --output table; \
+		echo ""; \
+		echo "数分後に 'make instances' で新しいインスタンスを確認してください。"
 
 # ==============================================================================
 # [dev] 開発用
