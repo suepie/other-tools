@@ -3,7 +3,7 @@
 	check whoami myip tools \
 	bootstrap-init bootstrap-plan bootstrap-apply bootstrap-output backend \
 	init reinit plan apply destroy output \
-	setup url creds exec logs status events instances tasks diag recycle \
+	setup url creds exec logs status events instances tasks diag recycle users \
 	fmt validate clean
 
 # ==============================================================================
@@ -200,6 +200,15 @@ tasks: ## [forge] タスクの状態と停止理由を表示
 		done
 
 diag: status instances events tasks ## [forge] 上記4つをまとめて実行
+
+users: ## [forge] 登録済みユーザーを一覧表示
+	@cd $(ECS_DIR) && \
+		cluster="$$(terraform output -raw cluster_name)"; \
+		task="$$(aws ecs list-tasks --cluster "$$cluster" --service-name "$$cluster" \
+			--query 'taskArns[0]' --output text)"; \
+		if [ -z "$$task" ] || [ "$$task" = "None" ]; then echo "forge タスクが動いていません。"; exit 1; fi; \
+		aws ecs execute-command --cluster "$$cluster" --task "$$task" --container forgejo \
+			--interactive --command "su git -c 'forgejo admin user list'"
 
 recycle: ## [forge] インスタンスを入れ替える（インスタンス要件の変更を即時反映させたいとき）
 	@cd $(ECS_DIR) && \
