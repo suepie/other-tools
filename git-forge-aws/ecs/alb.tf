@@ -18,6 +18,13 @@ resource "aws_lb" "forge" {
   idle_timeout               = 300
   drop_invalid_header_fields = true
 
+  # オリジンに到達したリクエストの記録
+  access_logs {
+    bucket  = aws_s3_bucket.logs.id
+    prefix  = "alb"
+    enabled = true
+  }
+
   # ALB とターゲットグループの名前は 32 文字までという制約がある。
   # AWS 側の分かりにくいエラーになる前に、plan の段階で止める。
   lifecycle {

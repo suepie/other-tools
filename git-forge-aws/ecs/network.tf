@@ -1,10 +1,11 @@
 #
 # ネットワーク。
-#   public  : ECS インスタンス / EFS マウントターゲット（イメージ取得のため外向き通信が要る）
-#   private : 内部 ALB / RDS / CloudFront VPC オリジンの ENI
+#   public  : NAT Gateway のみ（IGW への経路を持つ唯一のサブネット）
+#   private : ECS インスタンス / 内部 ALB / RDS / EFS / CloudFront VPC オリジンの ENI
 #
-# 入口は CloudFront だけです。ALB は internal なのでインターネットからは到達できません。
-# 固定 IP による制限は CloudFront 側の WAF で行います（cloudfront.tf）。
+# ワークロードはすべてプライベートサブネットにあり、パブリック IP を持ちません。
+# 外向き通信（イメージ取得・AWS API・CI）は NAT Gateway 経由です。
+# 入口は CloudFront だけで、固定 IP 制限は WAF で行います（cloudfront.tf）。
 #
 
 data "aws_availability_zones" "available" {
@@ -28,7 +29,7 @@ resource "aws_vpc" "this" {
   tags = { Name = "${local.name_prefix}-vpc" }
 }
 
-# VPC オリジンの前提条件。ルーティングには使われませんが、
+# VPC オリジンの前提条件でもあります。ルーティングには使われませんが、
 # 「この VPC はインターネットからのトラフィックを受けられる」ことを示すために必須です。
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
@@ -36,18 +37,20 @@ resource "aws_internet_gateway" "this" {
   tags = { Name = "${local.name_prefix}-igw" }
 }
 
+# ---- サブネット ----------------------------------------------------------
+
+# NAT Gateway を置くためだけのサブネット。ここにワークロードは置きません。
 resource "aws_subnet" "public" {
   count = 2
 
   vpc_id                  = aws_vpc.this.id
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
   availability_zone       = local.usable_azs[count.index]
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
 
   tags = { Name = "${local.name_prefix}-public-${count.index}" }
 }
 
-# 内部 ALB / RDS / CloudFront の ENI を置く。インターネットへの経路は持たせない
 resource "aws_subnet" "private" {
   count = 2
 
@@ -57,6 +60,29 @@ resource "aws_subnet" "private" {
 
   tags = { Name = "${local.name_prefix}-private-${count.index}" }
 }
+
+# ---- NAT Gateway ---------------------------------------------------------
+
+resource "aws_eip" "nat" {
+  count = var.nat_gateway_count
+
+  domain = "vpc"
+
+  tags = { Name = "${local.name_prefix}-nat-${count.index}" }
+}
+
+resource "aws_nat_gateway" "this" {
+  count = var.nat_gateway_count
+
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = aws_subnet.public[count.index].id
+
+  tags = { Name = "${local.name_prefix}-nat-${count.index}" }
+
+  depends_on = [aws_internet_gateway.this]
+}
+
+# ---- ルートテーブル ------------------------------------------------------
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
@@ -76,15 +102,37 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# プライベート側は AZ ごとにルートテーブルを持ちます。
+# NAT が 1 台のときは両 AZ とも同じ NAT を向きます（AZ 間通信料が少し発生します）。
+resource "aws_route_table" "private" {
+  count = length(aws_subnet.private)
+
+  vpc_id = aws_vpc.this.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.this[min(count.index, var.nat_gateway_count - 1)].id
+  }
+
+  tags = { Name = "${local.name_prefix}-private-${count.index}" }
+}
+
+resource "aws_route_table_association" "private" {
+  count = length(aws_subnet.private)
+
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private[count.index].id
+}
+
 # S3 へのゲートウェイエンドポイント。
-# Forgejo が LFS / 添付 / Packages / Actions 成果物を読み書きする通信を、
-# インターネット経由ではなく AWS 内部の経路に閉じます。
-# ゲートウェイ型は追加料金がかかりません。
+# Forgejo が LFS / 添付 / Packages / Actions 成果物を読み書きする通信を
+# NAT とインターネットを経由させず、AWS 内部の経路に閉じます。
+# ゲートウェイ型は追加料金がかからず、NAT のデータ処理料も節約できます。
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.this.id
   service_name      = "com.amazonaws.${var.region}.s3"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = [aws_route_table.public.id]
+  route_table_ids   = aws_route_table.private[*].id
 
   tags = { Name = "${local.name_prefix}-s3" }
 }
@@ -143,9 +191,11 @@ resource "aws_vpc_security_group_ingress_rule" "instance_from_alb" {
   ip_protocol                  = "tcp"
 }
 
+# CI がパッケージレジストリやコンテナレジストリに出られないと機能しないため開けています。
+# 経路は NAT Gateway 経由で、インスタンス自体はパブリック IP を持ちません。
 resource "aws_vpc_security_group_egress_rule" "instance_all" {
   security_group_id = aws_security_group.instance.id
-  description       = "Outbound for image pull / AWS APIs / CI"
+  description       = "Outbound via NAT for image pull / AWS APIs / CI"
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1"
 }

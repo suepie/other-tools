@@ -63,6 +63,20 @@ output "log_group" {
   value       = aws_cloudwatch_log_group.forge.name
 }
 
+output "audit_logs" {
+  description = "監査ログの保存先"
+  value = {
+    cloudfront = "s3://${aws_s3_bucket.logs.id}/cloudfront/"
+    alb        = "s3://${aws_s3_bucket.logs.id}/alb/"
+    waf        = "${aws_cloudwatch_log_group.waf.name} (us-east-1)"
+  }
+}
+
+output "nat_public_ips" {
+  description = "NAT Gateway の外向き IP。外部サービス側で許可リストに入れる場合に使います"
+  value       = aws_eip.nat[*].public_ip
+}
+
 output "efs_id" {
   description = "ベア Git リポジトリを置いている EFS"
   value       = aws_efs_file_system.forge.id

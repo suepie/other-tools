@@ -123,6 +123,32 @@ variable "cloudfront_price_class" {
   default     = "PriceClass_200"
 }
 
+variable "nat_gateway_count" {
+  description = <<-EOT
+    NAT Gateway の台数（1 または 2）。
+
+    ワークロードはプライベートサブネットに置き、外向き通信はここを通ります。
+    1 台なら安いですが、その AZ が落ちると外向き通信が止まります
+    （リポジトリの閲覧・push は継続しますが、イメージ取得や CI が失敗します）。
+    2 台にすると AZ 冗長になり、費用が倍になります。
+
+    1 台あたり月 $35〜40 程度 + データ処理料がかかります。
+  EOT
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.nat_gateway_count >= 1 && var.nat_gateway_count <= 2
+    error_message = "nat_gateway_count は 1 または 2 にしてください。"
+  }
+}
+
+variable "access_log_retention_days" {
+  description = "S3 に置くアクセスログ（CloudFront / ALB）の保持日数"
+  type        = number
+  default     = 90
+}
+
 variable "excluded_az_ids" {
   description = <<-EOT
     使用しない AZ の ID。

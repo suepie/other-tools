@@ -114,6 +114,14 @@ resource "aws_cloudfront_distribution" "forge" {
   web_acl_id      = aws_wafv2_web_acl.forge.arn
   is_ipv6_enabled = true
 
+  # 誰がどの URL にアクセスしたかの記録。
+  # ログ配信は CMK に非対応のため、バケット側は AES256 にしてあります（logging.tf）。
+  logging_config {
+    bucket          = aws_s3_bucket.logs.bucket_domain_name
+    prefix          = "cloudfront/"
+    include_cookies = false
+  }
+
   origin {
     origin_id   = "forge-alb"
     domain_name = aws_lb.forge.dns_name

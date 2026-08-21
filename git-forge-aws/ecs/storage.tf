@@ -89,10 +89,10 @@ resource "aws_efs_file_system" "forge" {
 }
 
 resource "aws_efs_mount_target" "forge" {
-  count = length(aws_subnet.public)
+  count = length(aws_subnet.private)
 
   file_system_id  = aws_efs_file_system.forge.id
-  subnet_id       = aws_subnet.public[count.index].id
+  subnet_id       = aws_subnet.private[count.index].id
   security_groups = [aws_security_group.efs.id]
 }
 

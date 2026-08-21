@@ -113,7 +113,7 @@ resource "aws_ecs_capacity_provider" "managed" {
       monitoring               = "BASIC"
 
       network_configuration {
-        subnets         = aws_subnet.public[*].id
+        subnets         = aws_subnet.private[*].id
         security_groups = [aws_security_group.instance.id]
       }
 
