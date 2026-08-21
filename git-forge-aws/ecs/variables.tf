@@ -223,9 +223,33 @@ variable "db_backup_retention_days" {
 # ---- 管理者 --------------------------------------------------------------
 
 variable "admin_username" {
-  description = "初期管理者のユーザー名"
+  description = <<-EOT
+    初期管理者のユーザー名。
+
+    ★Forgejo には予約語があり、"admin" や "user" などは使えません。
+    URL のパスと衝突するためで、指定すると bootstrap タスクが
+    「createuser: name is reserved」で失敗します（管理者が作られません）。
+  EOT
   type        = string
   default     = "forgeadmin"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,38}$", var.admin_username))
+    error_message = "admin_username は英数字で始まり、英数字・ドット・ハイフン・アンダースコアのみで 1〜39 文字にしてください。"
+  }
+
+  validation {
+    # Forgejo / Gitea の予約ユーザー名。URL パスと衝突するものが登録されています。
+    condition = !contains([
+      "admin", "api", "assets", "attachments", "avatar", "avatars", "captcha",
+      "commits", "debug", "devtest", "error", "explore", "favicon.ico", "ghost",
+      "issues", "login", "manifest.json", "metrics", "milestones", "new",
+      "notifications", "org", "pulls", "raw", "repo", "repo-avatars",
+      "robots.txt", "search", "serviceworker.js", "ssh_info",
+      "swagger.v1.json", "user", "v2", "well-known",
+    ], lower(var.admin_username))
+    error_message = "admin_username に Forgejo の予約語は使えません（admin / user / api / new / org / repo / explore など）。forgeadmin のような名前にしてください。"
+  }
 }
 
 variable "admin_email" {

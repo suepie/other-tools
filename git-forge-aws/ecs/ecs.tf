@@ -36,6 +36,12 @@ locals {
     { name = "FORGEJO__service__DISABLE_REGISTRATION", value = "true" },
     { name = "FORGEJO__service__REQUIRE_SIGNIN_VIEW", value = "true" },
 
+    # 既定では、メールアドレスのハッシュを使って外部（Gravatar / Libravatar）から
+    # アバターを取得します。閉じた環境で知財を守る構成なので、外部への発信を止めます。
+    # アバターはローカル生成の識別アイコンになります。
+    { name = "FORGEJO__picture__DISABLE_GRAVATAR", value = "true" },
+    { name = "FORGEJO__picture__ENABLE_FEDERATED_AVATAR", value = "false" },
+
     { name = "FORGEJO__actions__ENABLED", value = "true" },
 
     # LFS / 添付 / アバター / Packages / Actions のログと成果物を S3 に逃がす。
@@ -373,14 +379,28 @@ resource "aws_ecs_task_definition" "bootstrap" {
       ])
 
       entryPoint = ["/bin/sh", "-c"]
+
+      # 各処理の成否を明示し、最後に実際の状態（ユーザー一覧・ランナー一覧）を出します。
+      # 「失敗したのか、既に存在したのか」がログだけで判別できるようにするためです。
       command = [
         join(" ", [
+          "echo '=== 1. admin user ===';",
           "forgejo admin user create --admin --username \"$FORGE_ADMIN_USER\"",
           "--email \"$FORGE_ADMIN_EMAIL\" --password \"$FORGE_ADMIN_PASSWORD\"",
-          "--must-change-password=false || echo 'admin may already exist';",
+          "--must-change-password=false",
+          "&& echo 'RESULT: admin created'",
+          "|| echo 'RESULT: admin create returned non-zero (already exists? 上のエラーを確認)';",
+
+          "echo '=== 2. actions runner ===';",
           "forgejo forgejo-cli actions register --name ecs-runner",
           "--labels \"$RUNNER_LABELS\" --secret \"$RUNNER_SECRET\"",
-          "|| echo 'runner may already be registered';",
+          "&& echo 'RESULT: runner registered'",
+          "|| echo 'RESULT: runner register returned non-zero (already registered? 上のエラーを確認)';",
+
+          # ここが最終的な答え。成否メッセージではなく実際の状態を出す
+          "echo '=== 3. 現在のユーザー一覧（ここに admin が居れば成功） ===';",
+          "forgejo admin user list || echo 'user list に失敗しました';",
+
           "echo bootstrap-done",
         ])
       ]
