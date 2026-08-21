@@ -76,6 +76,19 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# S3 へのゲートウェイエンドポイント。
+# Forgejo が LFS / 添付 / Packages / Actions 成果物を読み書きする通信を、
+# インターネット経由ではなく AWS 内部の経路に閉じます。
+# ゲートウェイ型は追加料金がかかりません。
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.public.id]
+
+  tags = { Name = "${local.name_prefix}-s3" }
+}
+
 # ---- セキュリティグループ ------------------------------------------------
 
 # CloudFront のオリジン向け IP レンジ。VPC オリジンからの通信をこれで許可する

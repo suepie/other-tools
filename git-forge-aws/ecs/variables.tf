@@ -188,6 +188,32 @@ variable "runner_labels" {
   default     = "docker:docker://node:22-bookworm"
 }
 
+variable "webhook_allowed_hosts" {
+  description = <<-EOT
+    Webhook の送信先として許可するホスト。
+
+    Webhook は任意の URL へリポジトリの内容を POST できるため、
+    そのままだと知財の持ち出し経路になります。既定は空（すべて拒否）です。
+
+    許可する場合は Forgejo の書式で指定します。
+      "hooks.slack.com"        特定ホストのみ
+      "external"               外部ホストをすべて許可（Forgejo の既定値。非推奨）
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "enable_mirrors" {
+  description = <<-EOT
+    リポジトリのミラー機能を有効にするか。
+
+    push mirror を使うとリポジトリの内容を外部へ送り出せるため、既定で無効です。
+    外部リポジトリからの取り込み（pull mirror）も同時に無効になります。
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "enable_runner" {
   description = "Actions ランナーを動かすか"
   type        = bool

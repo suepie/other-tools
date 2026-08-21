@@ -36,11 +36,27 @@ locals {
     { name = "FORGEJO__service__DISABLE_REGISTRATION", value = "true" },
     { name = "FORGEJO__service__REQUIRE_SIGNIN_VIEW", value = "true" },
 
-    # 既定では、メールアドレスのハッシュを使って外部（Gravatar / Libravatar）から
-    # アバターを取得します。閉じた環境で知財を守る構成なので、外部への発信を止めます。
-    # アバターはローカル生成の識別アイコンになります。
+    # ---- 外向き通信の抑止 ----
+    # 入口を CloudFront + WAF で固めても、サーバ側から外へ出る経路は別問題です。
+    # 知財保護が目的なので、既定で外部へ出る機能を止めます。
+
+    # メールアドレスのハッシュを外部（Gravatar / Libravatar）へ送ってアバターを取得する
     { name = "FORGEJO__picture__DISABLE_GRAVATAR", value = "true" },
     { name = "FORGEJO__picture__ENABLE_FEDERATED_AVATAR", value = "false" },
+
+    # 静的アセットを外部 CDN から読ませない（すべてローカル配信にする）
+    { name = "FORGEJO__server__OFFLINE_MODE", value = "true" },
+
+    # ActivityPub 連合。既定でも無効ですが明示しておく
+    { name = "FORGEJO__federation__ENABLED", value = "false" },
+
+    # Webhook は任意の URL へ POST できるため、そのままだと持ち出し経路になります。
+    # 既定は空（すべて拒否）。必要になったら webhook_allowed_hosts で許可先を指定します。
+    { name = "FORGEJO__webhook__ALLOWED_HOST_LIST", value = var.webhook_allowed_hosts },
+
+    # ミラーは外部リポジトリと同期する機能で、push mirror を使うと
+    # リポジトリの内容を外部へ送り出せます。既定で無効にします。
+    { name = "FORGEJO__mirror__ENABLED", value = tostring(var.enable_mirrors) },
 
     { name = "FORGEJO__actions__ENABLED", value = "true" },
 

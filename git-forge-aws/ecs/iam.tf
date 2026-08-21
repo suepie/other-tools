@@ -156,10 +156,11 @@ data "aws_iam_policy_document" "task" {
 
   statement {
     sid = "MountEfs"
+    # ClientRootAccess は付けません。アクセスポイントで uid/gid 1000 を強制しており、
+    # root としての書き込みは不要なためです。
     actions = [
       "elasticfilesystem:ClientMount",
       "elasticfilesystem:ClientWrite",
-      "elasticfilesystem:ClientRootAccess",
     ]
     resources = [aws_efs_file_system.forge.arn]
 
