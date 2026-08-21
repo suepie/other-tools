@@ -33,6 +33,15 @@ resource "aws_lb" "forge" {
       error_message = "project と component を合わせた長さ（ハイフン込み）が 32 文字を超えています（現在 ${length(local.name_prefix)} 文字）。ALB 名の上限です。短くしてください。"
     }
   }
+
+  # ALB は作成時にログバケットへ書き込みテストを行います。
+  # bucket を参照しているだけではポリシーとの順序が保証されず、
+  # ポリシー適用前に作られて「Please check S3bucket permission」になります。
+  depends_on = [
+    aws_s3_bucket_policy.logs,
+    aws_s3_bucket_ownership_controls.logs,
+    aws_s3_bucket_server_side_encryption_configuration.logs,
+  ]
 }
 
 resource "aws_lb_target_group" "forge" {

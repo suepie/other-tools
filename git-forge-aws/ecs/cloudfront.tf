@@ -154,6 +154,10 @@ resource "aws_cloudfront_distribution" "forge" {
     }
   }
 
+  # CloudFront もログ配信の設定時にバケットの ACL を更新します。
+  # ACL 有効化（BucketOwnerPreferred）より先に作られると失敗するため順序を固定します。
+  depends_on = [aws_s3_bucket_ownership_controls.logs]
+
   # 既定ドメイン（*.cloudfront.net）の証明書を使う。独自ドメイン不要
   viewer_certificate {
     cloudfront_default_certificate = true
