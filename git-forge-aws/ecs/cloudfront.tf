@@ -107,12 +107,22 @@ data "aws_cloudfront_origin_request_policy" "all_viewer" {
 }
 
 resource "aws_cloudfront_distribution" "forge" {
-  enabled         = true
-  comment         = local.name_prefix
-  price_class     = var.cloudfront_price_class
-  http_version    = "http2and3"
-  web_acl_id      = aws_wafv2_web_acl.forge.arn
-  is_ipv6_enabled = true
+  enabled      = true
+  comment      = local.name_prefix
+  price_class  = var.cloudfront_price_class
+  http_version = "http2and3"
+  web_acl_id   = aws_wafv2_web_acl.forge.arn
+  # ★IPv6 は無効にします。
+  #
+  # WAF の IP セットは IPv4 と IPv6 を1つに混在させられず（aws_wafv2_ip_set の
+  # ip_address_version は片方のみ）、このスタックの許可リストは IPv4 専用です。
+  # 一方 default_action は block なので、IPv6 で来たクライアントは
+  # allow-listed-ips に一致しようがなく、必ず Default_Action で 403 になります。
+  #
+  # 国内の回線は IPv6 が使えると Happy Eyeballs でそちらを優先するため、
+  # 「IPv4 を allowed_cidrs に入れたのに 403 のまま」という形で表面化します。
+  # IPv6 を無効にすればクライアントは IPv4 にフォールバックし、許可リストが効きます。
+  is_ipv6_enabled = false
 
   # 誰がどの URL にアクセスしたかの記録。
   # ログ配信は CMK に非対応のため、バケット側は AES256 にしてあります（logging.tf）。

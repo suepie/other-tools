@@ -60,6 +60,23 @@ data "aws_iam_policy_document" "forge_kms" {
       values   = ["arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:*"]
     }
   }
+
+  # CloudWatch アラームが暗号化された SNS トピックに publish するために必要。
+  # これがないとアラーム状態になっても通知が飛ばず、失敗も表に出ません。
+  statement {
+    sid = "AllowCloudWatchAlarmsToPublishToSNS"
+
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey*",
+    ]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+  }
 }
 
 resource "aws_kms_alias" "forge" {

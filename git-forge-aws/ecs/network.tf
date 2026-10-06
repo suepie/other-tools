@@ -164,6 +164,18 @@ resource "aws_vpc_security_group_ingress_rule" "alb_from_cloudfront" {
   ip_protocol       = "tcp"
 }
 
+# Actions ランナーが forge へ登録・ポーリングする経路。
+# runner は forge と同じインスタンスに置かれる保証がないため localhost ではなく
+# ALB 経由で接続します（ecs.tf）。
+resource "aws_vpc_security_group_ingress_rule" "alb_from_instance" {
+  security_group_id            = aws_security_group.alb.id
+  description                  = "HTTP from ECS instances (Actions runner)"
+  referenced_security_group_id = aws_security_group.instance.id
+  from_port                    = 80
+  to_port                      = 80
+  ip_protocol                  = "tcp"
+}
+
 resource "aws_vpc_security_group_egress_rule" "alb_to_instance" {
   security_group_id            = aws_security_group.alb.id
   description                  = "Forward to ECS instances"

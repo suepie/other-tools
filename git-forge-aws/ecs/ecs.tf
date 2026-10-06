@@ -2,8 +2,9 @@
 # ECS クラスタ / Managed Instances キャパシティプロバイダ / タスク定義 / サービス。
 #
 # forge と runner を同じキャパシティプロバイダに載せています（構成の単純さを優先）。
-# ネットワークモードは host にしているので、runner は http://localhost:3000 で
-# forge に到達できます（内部 ALB や service discovery が不要になります）。
+# ネットワークモードは host です。runner は内部 ALB 経由で forge に到達します
+# （同一ホストに置かれる保証がないため localhost は使いません。network.tf の
+# alb_from_instance ルールで許可しています）。
 #
 
 locals {
@@ -32,6 +33,14 @@ locals {
     { name = "FORGEJO__database__NAME", value = aws_db_instance.forge.db_name },
     { name = "FORGEJO__database__USER", value = aws_db_instance.forge.username },
     { name = "FORGEJO__database__SSL_MODE", value = "require" },
+
+    # ---- イシュー検索 ----
+    # 既定の bleve は日本語を分割できず、CJK を 1 文字ずつの項として展開します。
+    # イシューが数百件を超えると日本語の検索が数分〜終わらなくなり、溜まった検索が
+    # CPU を食い潰して、DB 更新まで遅く見える（実際は forge 側の CPU 枯渇）状態になります。
+    # db は PostgreSQL の部分一致検索で、インデックス構築も不要です。
+    # ISSUE_INDEXER_PATH は bleve 専用なので効かなくなりますが、残しても無害です。
+    { name = "FORGEJO__indexer__ISSUE_INDEXER_TYPE", value = "db" },
 
     { name = "FORGEJO__service__DISABLE_REGISTRATION", value = "true" },
     { name = "FORGEJO__service__REQUIRE_SIGNIN_VIEW", value = "true" },
@@ -89,9 +98,12 @@ resource "aws_cloudwatch_log_group" "forge" {
 resource "aws_ecs_cluster" "this" {
   name = local.name_prefix
 
+  # コンテナ単位のメモリ実測値（MemoryUtilized）を取るために有効化しています。
+  # 無効のままだと forge の OOM が「forge 自身が上限を超えた」のか
+  # 「docker.sock 経由の CI ジョブコンテナがホストを圧迫した」のか区別できません。
   setting {
     name  = "containerInsights"
-    value = "disabled"
+    value = var.container_insights ? "enhanced" : "disabled"
   }
 }
 
@@ -178,11 +190,12 @@ resource "aws_ecs_task_definition" "forge" {
 
   container_definitions = jsonencode([
     {
-      name              = "forgejo"
-      image             = var.forge_image
-      essential         = true
-      memory            = 2048
-      memoryReservation = 1024
+      name      = "forgejo"
+      image     = var.forge_image
+      essential = true
+      # 上限は forge_memory_mib で調整します（決め方は variables.tf の説明を参照）。
+      memory            = var.forge_memory_mib
+      memoryReservation = 2048
 
       environment = local.forge_env
       secrets     = local.forge_secrets
@@ -214,6 +227,14 @@ resource "aws_ecs_task_definition" "forge" {
       }
     },
   ])
+
+  # 上限がインスタンスのメモリ以上だと、上限として機能しません。
+  lifecycle {
+    precondition {
+      condition     = var.forge_memory_mib <= var.instance_memory_mib_min
+      error_message = "forge_memory_mib（${var.forge_memory_mib}）が instance_memory_mib_min（${var.instance_memory_mib_min}）を超えています。instance_memory_mib_min を上げるか、forge_memory_mib を下げてください。"
+    }
+  }
 }
 
 resource "aws_ecs_service" "forge" {
@@ -249,7 +270,11 @@ resource "aws_ecs_service" "forge" {
 
 # ---- Actions ランナー ----------------------------------------------------
 #
-# forge と同じインスタンス上で動き、http://localhost:3000 で forge に接続します。
+# forge には内部 ALB 経由で接続します。
+# localhost:3000 は「forge と同じホストに置かれる」ことが前提になりますが、
+# ECS には他サービスとの同一ホスト配置を強制する仕組みがなく、
+# インスタンスの入れ替え時などに別ホストへ置かれると CI が止まります。
+# ALB 宛なら配置に依存しません。
 # docker.sock をマウントするのでジョブごとにコンテナを起動できます
 # （Fargate ではこれができないため Managed Instances を選んでいます）。
 
@@ -280,6 +305,11 @@ resource "aws_ecs_task_definition" "runner" {
       memory            = 1536
       memoryReservation = 512
 
+      # イメージ既定の uid 1000 ではホストの /var/run/docker.sock（root:docker 660）
+      # に触れず "permission denied" で即死し、再起動を繰り返します。
+      # docker.sock を渡す時点で root 相当なので root で動かします。
+      user = "0:0"
+
       # forge が起動するまで登録を再試行し、成功したらデーモンを起動する。
       # 共有シークレット方式なので、インスタンスが入れ替わっても同じ ID で再登録されます。
       entryPoint = ["/bin/sh", "-c"]
@@ -287,10 +317,10 @@ resource "aws_ecs_task_definition" "runner" {
         join(" ", [
           "set -e;",
           "mkdir -p /data;",
-          "printf 'runner:\\n  labels:\\n' > /data/config.yaml;",
+          "printf 'runner:\\n  capacity: ${var.runner_capacity}\\n  labels:\\n' > /data/config.yaml;",
           "for l in $(echo \"$RUNNER_LABELS\" | tr ',' ' '); do printf '    - %s\\n' \"$l\" >> /data/config.yaml; done;",
           "i=0;",
-          "until forgejo-runner create-runner-file --instance http://localhost:3000 --secret \"$RUNNER_SECRET\"; do",
+          "until forgejo-runner create-runner-file --instance http://${aws_lb.forge.dns_name} --secret \"$RUNNER_SECRET\"; do",
           "i=$((i+1)); [ $i -gt 60 ] && exit 1; echo 'waiting for forge...'; sleep 5;",
           "done;",
           "exec forgejo-runner daemon --config /data/config.yaml",

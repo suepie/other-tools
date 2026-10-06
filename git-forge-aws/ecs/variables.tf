@@ -208,6 +208,65 @@ variable "runner_image" {
   default     = "code.forgejo.org/forgejo/runner:9"
 }
 
+variable "forge_memory_mib" {
+  description = <<-EOT
+    forge コンテナのメモリ上限 (MiB)。超えると OOM kill → 再起動（その間 503）になります。
+
+    利用が増えると（issue / PR / Actions run の件数、自動化による頻繁な PR など）
+    定常の使用量が上がり、2048 では OOM で再起動を繰り返すようになります。
+    上限付近では OOM の前に cgroup のメモリ回収で全処理が極端に遅くなるため、
+    余裕を持たせてください。
+
+    ★instance_memory_mib_min 以下にしてください（plan 時に検査します）。
+    CI を使う場合は、残り（instance_memory_mib_min − これ − ランナーの 1536）が
+    CI ジョブコンテナに使える分になります。
+    例: インスタンス 16384 / forge 8192 → CI ジョブ用に約 6 GB。
+  EOT
+  type        = number
+  default     = 4096
+
+  validation {
+    condition     = var.forge_memory_mib >= 2048
+    error_message = "forge_memory_mib は 2048 以上にしてください（memoryReservation が 2048 のため）。"
+  }
+}
+
+variable "container_insights" {
+  description = <<-EOT
+    ECS Container Insights（enhanced）を有効にするか。
+    コンテナ単位の CPU / メモリ実測値が取れ、forge の OOM が forge 自身によるものか
+    CI ジョブコンテナによるものかを切り分けられます。
+    追加料金がかかります（小規模構成なら月数ドル程度）。
+    false にすると forge の CPU 張り付きアラーム（monitoring.tf）も作られません。
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "alarm_email" {
+  description = <<-EOT
+    アラームの通知先メールアドレス。空なら admin_email を使います。
+    ★apply 後に届く確認メールで Confirm subscription を押すまで通知は飛びません。
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "runner_capacity" {
+  description = <<-EOT
+    ランナーが同時に実行するジョブ数（forgejo-runner の runner.capacity）。
+    ジョブは docker.sock 経由でホスト上に直接コンテナとして走るため、
+    増やすときは instance_vcpu_min / instance_memory_mib_min も合わせて見直してください。
+  EOT
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.runner_capacity >= 1
+    error_message = "runner_capacity は 1 以上にしてください。"
+  }
+}
+
 variable "runner_labels" {
   description = "ランナーのラベル。ワークフローの runs-on に書く値"
   type        = string

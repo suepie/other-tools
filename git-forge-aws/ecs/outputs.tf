@@ -96,3 +96,16 @@ output "kms_key_arn" {
   description = "このプロジェクト専用の CMK"
   value       = aws_kms_key.forge.arn
 }
+
+output "alarm_topic_arn" {
+  description = "アラーム通知の SNS トピック。apply 後に届く確認メールで購読を承認してください"
+  value       = aws_sns_topic.alarms.arn
+}
+
+output "alarms" {
+  description = "設定しているアラーム"
+  value = {
+    alb_5xx   = aws_cloudwatch_metric_alarm.alb_5xx.alarm_name
+    forge_cpu = one(aws_cloudwatch_metric_alarm.forge_cpu[*].alarm_name)
+  }
+}

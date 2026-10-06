@@ -16,7 +16,7 @@
         ┌─────────────────┴─────────────────┐
         │      ECS Managed Instances        │  ← パッチはAWSが14日ごとに代行
         │   ┌──────────┐   ┌──────────┐     │
-        │   │ Forgejo  │   │  Runner  │     │  ← runnerはlocalhost:3000でforgeへ
+        │   │ Forgejo  │   │  Runner  │     │  ← runnerは内部ALB経由でforgeへ
         │   └──────────┘   └──────────┘     │
         └──────┬────────────┬──────────┬────┘
                │            │          │
@@ -307,6 +307,10 @@ git config --global http.lowSpeedTime 60
 | DB のバックアップ | RDS 自動バックアップ 14 日 |
 | S3 | バージョニング有効 |
 | 誤削除対策 | S3 バケットに `prevent_destroy`、RDS に `deletion_protection` |
+| 障害通知 | CloudWatch アラーム → SNS → メール（ALB の 5XX、forge の CPU 張り付き）。通知先は `alarm_email`、未設定なら `admin_email` |
+| メモリ | forge が OOM で再起動するようなら `forge_memory_mib` と `instance_memory_mib_min` を一緒に上げる |
+
+> ⚠️ **初回 apply 後、アラーム通知先に「AWS Notification - Subscription Confirmation」というメールが届きます。Confirm subscription を押すまで通知は一切届きません。** 未承認のままでも Terraform はエラーにならないので、必ず確認してください。
 
 **インスタンスが 14 日ごとに入れ替わる前提の設計**なので、永続データは一切インスタンス上に置いていません。ランナーは共有シークレット方式で起動のたびに自動再登録されます。
 

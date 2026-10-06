@@ -46,6 +46,13 @@ admin_email    = "admin@example.com"
 instance_vcpu_min       = 2
 instance_memory_mib_min = 8192
 
+# forge コンテナのメモリ上限（既定 4096）。instance_memory_mib_min 以下にします。
+# issue / PR / Actions run が増えて forge が OOM で再起動するようになったら上げ、
+# CI ジョブ用の余裕が減らないよう instance_memory_mib_min も一緒に上げてください。
+# 例: 利用が多い構成なら instance_vcpu_min = 4 / instance_memory_mib_min = 16384 /
+#     forge_memory_mib = 8192（CI ジョブ用に約 6 GB 残ります）
+# forge_memory_mib = 4096
+
 # CI のビルド作業領域もここを使います。大きなリポジトリや
 # イメージビルドが多いなら増やしてください。
 instance_storage_gib = 100
@@ -66,6 +73,18 @@ instance_storage_gib = 100
 # イメージタグは公式で最新を確認して固定してください
 # forge_image  = "codeberg.org/forgejo/forgejo:11"
 # runner_image = "code.forgejo.org/forgejo/runner:9"
+
+# ランナーの同時ジョブ数。ジョブコンテナはホスト上に直接走るので vCPU/メモリと相談
+# runner_capacity = 2
+
+# ---- 監視 ----
+
+# アラームの通知先。空なら admin_email に送ります。
+# ★apply 後に届く確認メールで Confirm subscription を押すまで通知は飛びません。
+# alarm_email = "ops@example.com"
+
+# Container Insights（追加料金あり）。false にすると CPU 張り付きアラームも作りません。
+# container_insights = true
 
 # ランナーのラベル（ワークフローの runs-on に書く値）
 # runner_labels = "docker:docker://node:22-bookworm"

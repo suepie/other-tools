@@ -13,3 +13,6 @@
 .env
 .env.*
 !.env.example
+
+# エディタ / AI ツールのローカル状態（Serena のプロジェクト設定・メモリ）
+.serena/
