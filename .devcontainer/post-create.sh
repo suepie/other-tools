@@ -28,6 +28,7 @@ check "AWS CLI"                aws --version
 check "Session Manager plugin" session-manager-plugin --version
 check "PowerShell"             pwsh --version
 check "uvx"                    uvx --version
+check "gcloud CLI"             gcloud --version
 
 # git-forge-aws は Terraform 1.11 以降が必要
 if command -v terraform >/dev/null 2>&1; then

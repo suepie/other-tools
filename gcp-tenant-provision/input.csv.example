@@ -1,0 +1,4 @@
+project_id,display_name,sa_name,fw_dest_ranges,fw_allow,gce_instance,gce_zone
+tenant-0001,テナント0001,app-runner,10.0.1.0/24;10.0.2.0/24,tcp:443;tcp:8443,vm-tenant-0001,asia-northeast1-a
+tenant-0002,テナント0002,app-runner,10.0.1.0/24,tcp:443,vm-tenant-0002,asia-northeast1-a
+tenant-0003,テナント0003,app-runner,10.0.1.0/24,tcp:443,,

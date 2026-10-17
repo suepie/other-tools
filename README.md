@@ -10,6 +10,7 @@
 | [ai-api-measure/](ai-api-measure/) | AI API へ短いプロンプトを一定間隔で投げ、TTFT・応答時間・トークン数・生成速度を CSV に記録する | PowerShell 5.1 / 7+ |
 | [har-measure/](har-measure/) | ブラウザからエクスポートした HAR を解析し、リクエストごとの所要時間を CSV に集計する | PowerShell 5.1 / 7+ |
 | [git-forge-aws/](git-forge-aws/) | プロジェクトごとに AWS アカウントを分けて、IP 制限付きの Forgejo（CI 込み）を ECS に立てる | Terraform 1.11+ / AWS |
+| [gcp-tenant-provision/](gcp-tenant-provision/) | CSV を入力に GCP プロジェクトを一括作成し、SA 作成・Shared VPC 側の EGRESS FW ルール作成・GCE への SA 紐づけまで行う。レビュー用の実行スクリプト生成と証跡取得もできる | bash 4+ / gcloud CLI |
 
 ## 開発環境（devcontainer）
 
@@ -44,6 +45,7 @@ VS Code でこのフォルダを開き、**「Reopen in Container」**を選ぶ�
 | **Session Manager plugin** | `aws ecs execute-command` でコンテナに入る用。AWS CLI に同梱されていないため個別に入れています |
 | **PowerShell 7** | `network-measure` / `ai-api-measure` / `har-measure` のスクリプト実行 |
 | Docker CLI | ホストの Docker を利用（docker-outside-of-docker） |
+| **gcloud CLI** | `gcp-tenant-provision` のスクリプト実行。`gcloud auth login` はコンテナ内で行う（`~/.config/gcloud` はホストと共有していない） |
 
 ### AWS 認証情報の共有について
 

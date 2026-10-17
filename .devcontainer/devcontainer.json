@@ -14,7 +14,9 @@
     "ghcr.io/devcontainers/features/powershell:1": {},
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
       "moby": false
-    }
+    },
+    // gcp-tenant-provision は gcloud CLI を使う
+    "ghcr.io/dhoeric/features/google-cloud-cli:1": {}
   },
 
   // Windows では HOME が空で USERPROFILE が入るため、連結すると両対応になります。
